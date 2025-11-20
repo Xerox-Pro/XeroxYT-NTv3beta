@@ -203,18 +203,23 @@ app.get('/api/channel', async (req, res) => {
     const channel = await youtube.getChannel(id);
     
     let videosFeed = await channel.getVideos();
-    let allVideos = [...(videosFeed.videos || [])];
+    let videosToReturn = videosFeed.videos || [];
 
     const targetPage = parseInt(page);
-    for (let i = 1; i < targetPage; i++) {
-      if (videosFeed.has_continuation) {
-        videosFeed = await videosFeed.getContinuation();
-        if (videosFeed.videos) {
-            allVideos.push(...videosFeed.videos);
+    
+    // ページネーションロジック修正: 
+    // 指定されたページの動画「のみ」を取得して返すように変更
+    // 以前は全ページの動画を累積して返していたため、重複が発生していた
+    if (targetPage > 1) {
+        for (let i = 1; i < targetPage; i++) {
+            if (videosFeed.has_continuation) {
+                videosFeed = await videosFeed.getContinuation();
+                videosToReturn = videosFeed.videos || [];
+            } else {
+                videosToReturn = []; // 続きがない場合
+                break;
+            }
         }
-      } else {
-        break;
-      }
     }
     
     const title = channel.metadata?.title || channel.header?.title?.text || channel.header?.author?.name || null;
@@ -247,7 +252,8 @@ app.get('/api/channel', async (req, res) => {
         videoCount: channel.metadata?.videos_count?.text ?? channel.metadata?.videos_count ?? '0'
       },
       page: targetPage, 
-      videos: allVideos
+      videos: videosToReturn,
+      nextPageToken: videosFeed.has_continuation ? String(targetPage + 1) : undefined
     });
 
   } catch (err) { 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getChannelDetails, getChannelVideos, getChannelHome, mapHomeVideoToVideo } from '../utils/api';
@@ -88,6 +87,7 @@ const ChannelPage: React.FC = () => {
                         channelAvatarUrl: channelDetails?.avatarUrl || v.channelAvatarUrl,
                         channelId: channelDetails?.id || v.channelId
                     }));
+                    // ページ1以外の場合は追加、それ以外は置き換え（API修正済）
                     setVideos(prev => pageToken && pageToken !== '1' ? [...prev, ...enrichedVideos] : enrichedVideos);
                     setVideosPageToken(vData.nextPageToken);
                     break;
@@ -95,7 +95,8 @@ const ChannelPage: React.FC = () => {
         } catch (err) {
             console.error(`Failed to load ${tab}`, err);
             if(tab === 'home') {
-                console.warn("Home tab fetch failed, staying empty.");
+                // ホームタブの読み込み失敗は静かに無視する（エラーメッセージをすぐ出さない）
+                console.warn("Home tab fetch failed.");
             } else {
                 setError(`[${tab}] タブの読み込みに失敗しました。`);
             }
@@ -153,26 +154,30 @@ const ChannelPage: React.FC = () => {
     );
 
     const renderHomeTab = () => {
+        if (isTabLoading && !homeData) return <div className="text-center p-8">読み込み中...</div>;
+        
+        // データがなく、ロード中でもない場合のみエラー・空状態を表示
+        // ただし、初期状態で即座に表示しないように配慮
         if (!homeData) {
-             return <div className="p-8 text-center text-yt-light-gray">ホームコンテンツを読み込めませんでした。</div>;
+             return null; 
         }
         
         return (
-            <div className="flex flex-col gap-10 pb-10">
+            <div className="flex flex-col gap-6 pb-10">
                 {/* Featured Video */}
                 {homeData.topVideo && (
-                    <div className="flex flex-col md:flex-row gap-6 border-b border-yt-spec-light-20 dark:border-yt-spec-20 pb-6">
-                         <div className="w-full md:w-[424px] aspect-video rounded-xl overflow-hidden flex-shrink-0">
+                    <div className="flex flex-col md:flex-row gap-4 md:gap-6 border-b border-yt-spec-light-20 dark:border-yt-spec-20 pb-6">
+                         <div className="w-full md:w-1/2 lg:w-[400px] aspect-video rounded-xl overflow-hidden flex-shrink-0">
                             <Link to={`/watch/${homeData.topVideo.videoId}`}>
                                 <img src={homeData.topVideo.thumbnail} alt={homeData.topVideo.title} className="w-full h-full object-cover" />
                             </Link>
                         </div>
-                        <div className="flex-1 py-2">
+                        <div className="flex-1 py-1 md:py-2 min-w-0">
                             <Link to={`/watch/${homeData.topVideo.videoId}`}>
-                                <h3 className="text-xl font-bold mb-2 line-clamp-2">{homeData.topVideo.title}</h3>
+                                <h3 className="text-base md:text-lg font-bold mb-1 md:mb-2 line-clamp-2">{homeData.topVideo.title}</h3>
                             </Link>
-                            <p className="text-sm text-yt-light-gray mb-4 line-clamp-3">{homeData.topVideo.description}</p>
-                            <div className="flex items-center text-sm text-yt-light-gray font-medium">
+                            <p className="text-xs md:text-sm text-yt-light-gray mb-2 md:mb-4 line-clamp-3">{homeData.topVideo.description}</p>
+                            <div className="flex items-center text-xs md:text-sm text-yt-light-gray font-medium">
                                 <span>{homeData.topVideo.viewCount}</span>
                                 <span className="mx-1">•</span>
                                 <span>{homeData.topVideo.published}</span>
@@ -186,20 +191,20 @@ const ChannelPage: React.FC = () => {
                     .filter(playlist => playlist.playlistId && playlist.items && playlist.items.length > 0) // Filter out invalid playlists
                     .map((playlist, index) => (
                     <div key={`${playlist.playlistId}-${index}`}>
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-bold">{playlist.title}</h3>
-                            <Link to={`/playlist/${playlist.playlistId}`} className="px-3 py-1 text-sm font-semibold text-yt-blue hover:bg-yt-blue/10 rounded-full">
+                        <div className="flex items-center justify-between mb-2 md:mb-4">
+                            <h3 className="text-base md:text-lg font-bold">{playlist.title}</h3>
+                            <Link to={`/playlist/${playlist.playlistId}`} className="px-3 py-1 text-xs md:text-sm font-semibold text-yt-blue hover:bg-yt-blue/10 rounded-full">
                                 すべて再生
                             </Link>
                         </div>
                         <HorizontalScrollContainer>
                             {playlist.items.map(video => (
-                                <div key={video.videoId} className="w-52 flex-shrink-0">
+                                <div key={video.videoId} className="w-40 md:w-48 flex-shrink-0">
                                     <VideoCard video={mapHomeVideoToVideo(video, channelDetails)} hideChannelInfo />
                                 </div>
                             ))}
                         </HorizontalScrollContainer>
-                         <hr className="mt-6 border-yt-spec-light-20 dark:border-yt-spec-20" />
+                         <hr className="mt-4 md:mt-6 border-yt-spec-light-20 dark:border-yt-spec-20" />
                     </div>
                 ))}
             </div>
@@ -207,7 +212,7 @@ const ChannelPage: React.FC = () => {
     };
 
     return (
-        <div className="max-w-[1284px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6">
             {/* Banner */}
             {channelDetails.bannerUrl && (
                 <div className="w-full aspect-[6/1] md:aspect-[6/1.2] lg:aspect-[6.2/1] rounded-xl overflow-hidden mb-6">
@@ -216,25 +221,23 @@ const ChannelPage: React.FC = () => {
             )}
 
             {/* Channel Header */}
-            <div className="flex flex-col md:flex-row items-center md:items-start gap-6 mb-6">
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-4 md:gap-6 mb-4 md:mb-6">
                 <div className="flex-shrink-0">
-                    <img src={channelDetails.avatarUrl} alt={channelDetails.name} className="w-20 h-20 md:w-40 md:h-40 rounded-full object-cover" />
+                    <img src={channelDetails.avatarUrl} alt={channelDetails.name} className="w-16 h-16 md:w-32 md:h-32 rounded-full object-cover" />
                 </div>
                 <div className="flex-1 text-center md:text-left min-w-0">
-                    <h1 className="text-2xl md:text-4xl font-bold mb-2">{channelDetails.name}</h1>
-                    <div className="text-yt-light-gray text-sm md:text-base mb-3 flex flex-wrap justify-center md:justify-start gap-x-2">
+                    <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">{channelDetails.name}</h1>
+                    <div className="text-yt-light-gray text-sm mb-3 flex flex-wrap justify-center md:justify-start gap-x-2">
                          <span>{channelDetails.handle}</span>
                          <span>•</span>
-                         <span>登録者数 {channelDetails.subscriberCount}人</span>
-                         <span>•</span>
-                         <span>動画 {channelDetails.videoCount}本</span>
+                         <span>{channelDetails.subscriberCount}</span>
                     </div>
-                    <p className="text-yt-light-gray text-sm line-clamp-2 mb-4 max-w-3xl cursor-pointer" onClick={() => alert(channelDetails.description)}>
+                    <p className="text-yt-light-gray text-sm line-clamp-1 mb-3 max-w-2xl cursor-pointer mx-auto md:mx-0" onClick={() => alert(channelDetails.description)}>
                         {channelDetails.description}
                     </p>
                     <button 
                         onClick={handleSubscriptionToggle} 
-                        className={`px-6 py-2 rounded-full text-sm font-medium transition-colors ${
+                        className={`px-4 md:px-6 py-2 rounded-full text-sm font-medium transition-colors ${
                             subscribed 
                             ? 'bg-yt-light dark:bg-[#272727] text-black dark:text-white hover:bg-[#e5e5e5] dark:hover:bg-[#3f3f3f]' 
                             : 'bg-black dark:bg-white text-white dark:text-black hover:opacity-90'
