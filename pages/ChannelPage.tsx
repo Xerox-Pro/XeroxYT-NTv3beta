@@ -178,7 +178,7 @@ const ChannelPage: React.FC = () => {
     const TabButton: React.FC<{tab: Tab, label: string}> = ({tab, label}) => (
         <button 
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 font-semibold text-sm ${activeTab === tab ? 'border-b-2 border-black dark:border-white' : 'text-yt-light-gray'}`}
+            className={`px-6 py-3 font-semibold text-base border-b-2 transition-colors ${activeTab === tab ? 'border-black dark:border-white text-black dark:text-white' : 'border-transparent text-yt-light-gray hover:text-black dark:hover:text-white'}`}
         >
             {label}
         </button>
@@ -208,7 +208,7 @@ const ChannelPage: React.FC = () => {
                             {isFetchingMore && <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-yt-blue"></div>}
                         </div>
                     </>
-                ) : <div className="text-center p-8">このチャンネルには動画がありません。</div>;
+                ) : <div className="text-center p-8 text-yt-light-gray">このチャンネルには動画がありません。</div>;
             case 'shorts':
                 return shorts.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-8">
@@ -216,7 +216,7 @@ const ChannelPage: React.FC = () => {
                             <ShortsCard key={video.id} video={video} />
                         ))}
                     </div>
-                ) : <div className="text-center p-8">このチャンネルにはショート動画がありません。</div>;
+                ) : <div className="text-center p-8 text-yt-light-gray">このチャンネルにはショート動画がありません。</div>;
             case 'playlists':
                 return playlists.length > 0 ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -234,51 +234,81 @@ const ChannelPage: React.FC = () => {
                             </div>
                         ))}
                     </div>
-                ) : <div className="text-center p-8">このチャンネルには再生リストがありません。</div>;
+                ) : <div className="text-center p-8 text-yt-light-gray">このチャンネルには再生リストがありません。</div>;
             default:
                 return null;
         }
     };
 
     return (
-        <div>
+        <div className="max-w-[1284px] mx-auto px-4 sm:px-6 lg:px-8">
+            {/* Banner */}
             {channelDetails.bannerUrl && (
-                <div className="w-full h-32 md:h-48 lg:h-56 mb-4">
+                <div className="w-full aspect-[6/1] rounded-xl overflow-hidden mb-6">
                     <img src={channelDetails.bannerUrl} alt={`${channelDetails.name} banner`} className="w-full h-full object-cover" />
                 </div>
             )}
-            <div className="flex flex-col sm:flex-row items-center px-4 mb-6">
-                <img src={channelDetails.avatarUrl} alt={channelDetails.name} className="w-20 h-20 sm:w-32 sm:h-32 rounded-full mr-0 sm:mr-6 mb-4 sm:mb-0" />
-                <div className="flex-1 text-center sm:text-left">
-                    <h1 className="text-2xl font-bold">{channelDetails.name}</h1>
-                    <div className="text-sm text-yt-light-gray mt-1 flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-x-2">
-                        {channelDetails.handle && <span>@{channelDetails.handle}</span>}
-                        {channelDetails.subscriberCount && channelDetails.subscriberCount !== '非公開' && <span>チャンネル登録者数 {channelDetails.subscriberCount}</span>}
-                        {channelDetails.videoCount > 0 && <span>動画 {channelDetails.videoCount.toLocaleString()}本</span>}
+
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row items-start mb-4">
+                {/* Avatar */}
+                <div className="mr-6 flex-shrink-0">
+                     <img src={channelDetails.avatarUrl} alt={channelDetails.name} className="w-24 h-24 sm:w-40 sm:h-40 rounded-full object-cover" />
+                </div>
+                
+                {/* Info & Actions */}
+                <div className="flex-1 flex flex-col justify-center pt-2">
+                    <h1 className="text-2xl sm:text-4xl font-bold mb-2">{channelDetails.name}</h1>
+                    
+                    <div className="text-sm text-yt-light-gray flex flex-wrap items-center gap-x-2 mb-3">
+                        {channelDetails.handle && <span className="font-medium text-black dark:text-white">@{channelDetails.handle}</span>}
+                        {channelDetails.subscriberCount && channelDetails.subscriberCount !== '非公開' && (
+                            <>
+                                <span className="text-xs">•</span>
+                                <span>チャンネル登録者数 {channelDetails.subscriberCount}</span>
+                            </>
+                        )}
+                        {channelDetails.videoCount > 0 && (
+                            <>
+                                <span className="text-xs">•</span>
+                                <span>動画 {channelDetails.videoCount.toLocaleString()}本</span>
+                            </>
+                        )}
                     </div>
+
                     {channelDetails.description && (
-                        <p className="text-sm text-yt-light-gray mt-2 line-clamp-2">
+                        <p className="text-sm text-yt-light-gray mb-4 line-clamp-1 cursor-pointer hover:text-black dark:hover:text-white transition-colors max-w-3xl">
                             {channelDetails.description.split('\n')[0]}
+                             <span className="ml-1 font-semibold text-black dark:text-white">...他</span>
                         </p>
                     )}
+                    
+                    <div className="mt-1">
+                         <button 
+                            onClick={handleSubscriptionToggle}
+                            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                                subscribed 
+                                ? 'bg-yt-light dark:bg-[#272727] text-black dark:text-white hover:bg-[#e5e5e5] dark:hover:bg-[#3f3f3f]' 
+                                : 'bg-black dark:bg-white text-white dark:text-black hover:opacity-90'
+                            }`}
+                        >
+                            {subscribed ? '登録済み' : 'チャンネル登録'}
+                        </button>
+                    </div>
                 </div>
-                 <button 
-                  onClick={handleSubscriptionToggle}
-                  className={`mt-4 sm:mt-0 font-semibold px-4 h-10 rounded-full text-sm flex items-center transform transition-transform duration-150 active:scale-95 ${subscribed ? 'bg-yt-light dark:bg-yt-dark-gray text-black dark:text-white' : 'bg-black dark:bg-white text-white dark:text-black hover:opacity-90'}`}
-                >
-                  {subscribed ? '登録済み' : 'チャンネル登録'}
-                </button>
             </div>
             
-            <div className="border-b border-yt-spec-light-20 dark:border-yt-spec-20">
-                <nav className="flex space-x-4">
+            {/* Tabs */}
+            <div className="border-b border-yt-spec-light-20 dark:border-yt-spec-20 mb-6">
+                <nav className="flex space-x-2">
                     <TabButton tab="videos" label="動画" />
                     <TabButton tab="shorts" label="ショート" />
                     <TabButton tab="playlists" label="再生リスト" />
                 </nav>
             </div>
 
-            <div className="mt-6">
+            {/* Content */}
+            <div>
                 {renderTabContent()}
             </div>
         </div>

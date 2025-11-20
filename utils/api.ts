@@ -227,12 +227,23 @@ export async function getChannelDetails(channelId: string): Promise<ChannelDetai
     const data = await apiFetch(`channel?id=${channelId}`);
     const channel = data.channel;
     if (!channel) throw new Error(`Channel with ID ${channelId} not found.`);
+
+    // FIX: Handle avatarURL correctly whether it is a string (from API normalization) or object/array
+    let avatarUrl = '';
+    if (typeof channel.avatar === 'string') {
+        avatarUrl = channel.avatar;
+    } else if (Array.isArray(channel.avatar) && channel.avatar.length > 0) {
+        avatarUrl = channel.avatar[0].url;
+    } else if (typeof channel.avatar === 'object' && channel.avatar?.url) {
+        avatarUrl = channel.avatar.url;
+    }
+
     return {
         id: channelId,
         name: channel.name ?? 'No Name',
-        avatarUrl: channel.avatar?.[0]?.url,
+        avatarUrl: avatarUrl,
         subscriberCount: channel.subscriberCount ?? '非公開',
-        bannerUrl: channel.banner?.url,
+        bannerUrl: channel.banner?.url || channel.banner,
         description: channel.description ?? '',
         videoCount: parseInt(channel.videoCount?.replace(/,/g, '') ?? '0'),
         handle: channel.name,
@@ -246,10 +257,10 @@ export async function getChannelVideos(channelId: string, pageToken = '1'): Prom
     const channelMeta = data.channel;
     let avatarUrl = '';
     if (channelMeta?.avatar) {
-        if (Array.isArray(channelMeta.avatar) && channelMeta.avatar.length > 0) {
-            avatarUrl = channelMeta.avatar[0].url;
-        } else if (typeof channelMeta.avatar === 'string') {
+        if (typeof channelMeta.avatar === 'string') {
             avatarUrl = channelMeta.avatar;
+        } else if (Array.isArray(channelMeta.avatar) && channelMeta.avatar.length > 0) {
+            avatarUrl = channelMeta.avatar[0].url;
         } else if (typeof channelMeta.avatar === 'object' && channelMeta.avatar.url) {
             avatarUrl = channelMeta.avatar.url;
         }

@@ -14,35 +14,39 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, hideChannelInfo = false })
   };
   
   return (
-    <Link to={`/watch/${video.id}`} className="flex flex-col group">
-      <div className="relative rounded-xl overflow-hidden">
-        <img src={video.thumbnailUrl} alt={video.title} className="w-full h-auto aspect-video object-cover group-hover:scale-105 transition-transform duration-300" />
+    <Link to={`/watch/${video.id}`} className="flex flex-col group cursor-pointer">
+      <div className="relative rounded-xl overflow-hidden aspect-video bg-yt-light dark:bg-yt-dark-gray">
+        <img 
+            src={video.thumbnailUrl} 
+            alt={video.title} 
+            className="w-full h-full object-cover" 
+        />
         {video.duration && (
-            <span className="absolute bottom-1 right-1 bg-black bg-opacity-80 text-white text-xs px-1.5 py-0.5 rounded-md">
+            <span className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-xs font-medium px-1.5 py-0.5 rounded-[4px]">
             {video.duration}
             </span>
         )}
       </div>
-      <div className="flex mt-3">
+      <div className="flex mt-3 items-start">
         {!hideChannelInfo && video.channelId && (
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 mr-3">
             <Link to={`/channel/${video.channelId}`} onClick={handleChannelLinkClick}>
-              <img src={video.channelAvatarUrl} alt={video.channelName} className="w-9 h-9 rounded-full" />
+              <img src={video.channelAvatarUrl} alt={video.channelName} className="w-9 h-9 rounded-full object-cover" />
             </Link>
           </div>
         )}
-        <div className={!hideChannelInfo && video.channelId ? 'ml-3' : ''}>
-          <h3 className="text-black dark:text-white text-base font-medium leading-snug break-words max-h-12 overflow-hidden line-clamp-2">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-black dark:text-white text-base font-semibold leading-snug line-clamp-2 mb-1">
             {video.title}
           </h3>
-          <div className="text-yt-light-gray text-sm mt-1">
+          <div className="text-yt-light-gray text-sm">
             {!hideChannelInfo && video.channelId && (
-                <Link to={`/channel/${video.channelId}`} onClick={handleChannelLinkClick} className="hover:text-black dark:hover:text-white block">
+                <Link to={`/channel/${video.channelId}`} onClick={handleChannelLinkClick} className="hover:text-black dark:hover:text-white block truncate">
                     {video.channelName}
                 </Link>
             )}
-            <p>
-              {[video.views?.includes('不明') ? null : video.views, video.uploadedAt].filter(Boolean).join(' \u2022 ')}
+            <p className="truncate">
+              {[video.views?.includes('不明') ? null : video.views, video.uploadedAt].filter(Boolean).join(' • ')}
             </p>
           </div>
         </div>

@@ -11,7 +11,7 @@ import PlaylistModal from '../components/PlaylistModal';
 import CommentComponent from '../components/Comment';
 import PlaylistPanel from '../components/PlaylistPanel';
 import StreamingPlayer from '../components/StreamingPlayer';
-import { LikeIcon, SaveIcon } from '../components/icons/Icons';
+import { LikeIcon, SaveIcon, MoreIconHorizontal } from '../components/icons/Icons';
 
 const VideoPlayerPage: React.FC = () => {
     const { videoId } = useParams<{ videoId: string }>();
@@ -218,9 +218,10 @@ const VideoPlayerPage: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-col lg:flex-row gap-6 max-w-[1700px] mx-auto">
             <div className="flex-grow lg:w-2/3">
-                <div className="aspect-video bg-yt-black rounded-xl overflow-hidden">
+                {/* Player Container */}
+                <div className="aspect-video bg-yt-black rounded-xl overflow-hidden shadow-lg">
                     {playerType === 'edu' ? (
                         <iframe src={iframeSrc} key={iframeSrc} title={videoDetails.title} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
                     ) : (
@@ -237,58 +238,93 @@ const VideoPlayerPage: React.FC = () => {
                     )}
                 </div>
 
-                <div className="flex items-start justify-between flex-wrap gap-y-2 mt-4">
-                    <h1 className="text-xl font-bold flex-grow pr-4">{videoDetails.title}</h1>
-                    <div className="flex items-center space-x-1 p-1 bg-yt-light dark:bg-yt-dark-gray rounded-full flex-shrink-0">
-                        <button
-                            onClick={() => setPlayerType('edu')}
-                            className={`px-3 py-1 text-sm font-semibold rounded-full transition-colors ${playerType === 'edu' ? 'bg-black text-white dark:bg-white dark:text-black' : 'hover:bg-yt-spec-light-10 dark:hover:bg-yt-spec-10'}`}
+                {/* Title */}
+                <div className="mt-3">
+                    <h1 className="text-xl font-bold text-black dark:text-white line-clamp-2">{videoDetails.title}</h1>
+                </div>
+
+                {/* Channel & Actions Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-2 gap-4">
+                    {/* Left Side: Channel Info */}
+                    <div className="flex items-center min-w-0">
+                        <Link to={`/channel/${videoDetails.channel.id}`} className="flex-shrink-0">
+                            <img src={videoDetails.channel.avatarUrl} alt={videoDetails.channel.name} className="w-10 h-10 rounded-full object-cover" />
+                        </Link>
+                        <div className="ml-3 flex flex-col mr-6">
+                            <Link to={`/channel/${videoDetails.channel.id}`} className="font-bold text-base text-black dark:text-white hover:text-opacity-80 truncate">
+                                {videoDetails.channel.name}
+                            </Link>
+                            <span className="text-xs text-yt-light-gray">{videoDetails.channel.subscriberCount}</span>
+                        </div>
+                        <button 
+                            onClick={handleSubscriptionToggle} 
+                            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                                subscribed 
+                                ? 'bg-yt-light dark:bg-[#272727] text-black dark:text-white hover:bg-[#e5e5e5] dark:hover:bg-[#3f3f3f]' 
+                                : 'bg-black dark:bg-white text-white dark:text-black hover:opacity-90'
+                            }`}
                         >
-                            標準
+                            {subscribed ? '登録済み' : 'チャンネル登録'}
                         </button>
-                        <button
-                            onClick={() => setPlayerType('stream')}
-                            className={`px-3 py-1 text-sm font-semibold rounded-full transition-colors ${playerType === 'stream' ? 'bg-black text-white dark:bg-white dark:text-black' : 'hover:bg-yt-spec-light-10 dark:hover:bg-yt-spec-10'}`}
-                        >
-                            ストリーミング
+                    </div>
+
+                    {/* Right Side: Actions */}
+                    <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar pb-2 sm:pb-0">
+                         {/* Like Button */}
+                        <div className="flex items-center bg-yt-light dark:bg-[#272727] rounded-full h-9 hover:bg-[#e5e5e5] dark:hover:bg-[#3f3f3f] transition-colors">
+                            <button className="flex items-center px-4 h-full border-r border-yt-light-gray/20">
+                                <LikeIcon />
+                                <span className="ml-2 text-sm font-semibold">{videoDetails.likes}</span>
+                            </button>
+                             {/* Dislike placeholder (visual only) */}
+                            <button className="px-4 h-full rounded-r-full">
+                                <div className="transform rotate-180">
+                                   <LikeIcon />
+                                </div>
+                            </button>
+                        </div>
+
+                        {/* Share/Save Button */}
+                        <button onClick={() => setIsPlaylistModalOpen(true)} className="flex items-center bg-yt-light dark:bg-[#272727] rounded-full h-9 px-4 hover:bg-[#e5e5e5] dark:hover:bg-[#3f3f3f] transition-colors whitespace-nowrap">
+                            <SaveIcon />
+                            <span className="ml-2 text-sm font-semibold">保存</span>
+                        </button>
+                        
+                        {/* More Button */}
+                        <button className="flex items-center justify-center bg-yt-light dark:bg-[#272727] rounded-full w-9 h-9 hover:bg-[#e5e5e5] dark:hover:bg-[#3f3f3f] transition-colors flex-shrink-0">
+                            <MoreIconHorizontal />
                         </button>
                     </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-4">
-                    <div className="flex items-center mb-4 sm:mb-0">
-                        <Link to={`/channel/${videoDetails.channel.id}`} className="flex items-center">
-                            <img src={videoDetails.channel.avatarUrl} alt={videoDetails.channel.name} className="w-10 h-10 rounded-full" />
-                            <div className="ml-3">
-                                <p className="font-semibold">{videoDetails.channel.name}</p>
-                                <p className="text-sm text-yt-light-gray">{videoDetails.channel.subscriberCount}</p>
-                            </div>
-                        </Link>
-                         <button onClick={handleSubscriptionToggle} className={`ml-6 font-semibold px-4 h-9 rounded-full text-sm flex items-center transform transition-transform duration-150 active:scale-95 ${subscribed ? 'bg-yt-light dark:bg-yt-dark-gray text-black dark:text-white' : 'bg-black dark:bg-white text-white dark:text-black hover:opacity-90'}`}>
-                            {subscribed ? '登録済み' : 'チャンネル登録'}
-                        </button>
+                {/* Description Box */}
+                <div className={`mt-4 bg-yt-light dark:bg-[#272727] p-3 rounded-xl text-sm cursor-pointer hover:bg-[#e5e5e5] dark:hover:bg-[#3f3f3f] transition-colors ${isDescriptionExpanded ? '' : 'h-28 overflow-hidden relative'}`} onClick={() => setIsDescriptionExpanded(prev => !prev)}>
+                     <div className="font-semibold mb-1">
+                        {videoDetails.views}  •  {videoDetails.uploadedAt}
                     </div>
-                    <div className="flex items-center space-x-2">
-                        <div className="flex items-center bg-yt-light dark:bg-yt-dark-gray rounded-full h-9 px-4 py-2">
-                            <LikeIcon />
-                            <span className="ml-2 text-sm font-semibold">{videoDetails.likes}</span>
+                    <div className="whitespace-pre-wrap break-words text-black dark:text-white">
+                        <div dangerouslySetInnerHTML={{ __html: videoDetails.description }} />
+                    </div>
+                     {!isDescriptionExpanded && (
+                        <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-yt-light dark:from-[#272727] to-transparent flex items-end p-3 font-semibold">
+                            もっと見る
                         </div>
-                        <button onClick={() => setIsPlaylistModalOpen(true)} className="flex items-center bg-yt-light dark:bg-yt-dark-gray rounded-full h-9 px-4 hover:bg-yt-spec-light-10 dark:hover:bg-yt-spec-10">
-                            <SaveIcon />
-                            <span className="ml-2 text-sm font-semibold">保存</span>
-                        </button>
-                    </div>
+                    )}
+                    {isDescriptionExpanded && (
+                         <div className="font-semibold mt-2">一部を表示</div>
+                    )}
                 </div>
-                <div className="mt-4 bg-yt-light dark:bg-yt-dark-gray p-3 rounded-xl cursor-pointer" onClick={() => setIsDescriptionExpanded(prev => !prev)}>
-                    <p className="font-semibold text-sm">{videoDetails.views} • {videoDetails.uploadedAt}</p>
-                    <p className={`text-sm mt-2 whitespace-pre-wrap ${!isDescriptionExpanded ? 'line-clamp-3' : ''}`} dangerouslySetInnerHTML={{ __html: videoDetails.description }} />
-                    <button className="font-semibold text-sm mt-2">
-                        {isDescriptionExpanded ? '一部を表示' : 'もっと見る'}
-                    </button>
-                </div>
+
+                {/* Comments Section */}
                  <div className="mt-6">
-                    <h2 className="text-xl font-bold">{comments.length.toLocaleString()}件のコメント</h2>
-                    <div className="mt-4">
+                    <div className="flex items-center mb-6">
+                        <h2 className="text-xl font-bold">{comments.length.toLocaleString()}件のコメント</h2>
+                        <div className="ml-8 flex items-center cursor-pointer">
+                             <span className="material-icons text-xl mr-2">sort</span>
+                             <span className="font-semibold text-sm">並べ替え</span>
+                        </div>
+                    </div>
+                    <div className="space-y-4">
                         {comments.map(comment => (
                             <CommentComponent key={comment.comment_id} comment={comment} />
                         ))}
@@ -296,12 +332,29 @@ const VideoPlayerPage: React.FC = () => {
                 </div>
             </div>
             
-            <div className="lg:w-1/3 lg:max-w-sm flex-shrink-0">
+            {/* Secondary Column: Recommendations / Playlist */}
+            <div className="lg:w-1/3 lg:max-w-[400px] flex-shrink-0">
+                {/* Player Type Switcher (moved here for better layout) */}
+                <div className="flex items-center space-x-2 mb-4 overflow-x-auto pb-2">
+                     <button
+                        onClick={() => setPlayerType('edu')}
+                        className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors whitespace-nowrap ${playerType === 'edu' ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-yt-light dark:bg-[#272727] hover:bg-[#e5e5e5] dark:hover:bg-[#3f3f3f]'}`}
+                    >
+                        すべて
+                    </button>
+                    <button
+                        onClick={() => setPlayerType('stream')}
+                         className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors whitespace-nowrap ${playerType === 'stream' ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-yt-light dark:bg-[#272727] hover:bg-[#e5e5e5] dark:hover:bg-[#3f3f3f]'}`}
+                    >
+                        関連動画
+                    </button>
+                </div>
+
                 {currentPlaylist && videoId ? (
                     <PlaylistPanel playlist={currentPlaylist} authorName={currentPlaylist.authorName} videos={playlistVideos} currentVideoId={videoId} isShuffle={isShuffle} isLoop={isLoop} toggleShuffle={toggleShuffle} toggleLoop={toggleLoop} onReorder={handlePlaylistReorder} />
                 ) : (
                     videoDetails.relatedVideos.length > 0 && (
-                        <div className="flex flex-col space-y-3">
+                        <div className="flex flex-col space-y-2">
                             {videoDetails.relatedVideos.map(video => (
                                 <RelatedVideoCard key={video.id} video={video} />
                             ))}
