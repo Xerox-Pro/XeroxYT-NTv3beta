@@ -80,13 +80,27 @@ const ChannelPage: React.FC = () => {
             switch (tab) {
                 case 'videos':
                     const vData = await getChannelVideos(channelId, pageToken);
-                    setVideos(prev => pageToken && pageToken !== '1' ? [...prev, ...vData.videos] : vData.videos);
+                    // Backfill channel info if missing
+                    const enrichedVideos = vData.videos.map(v => ({
+                        ...v,
+                        channelName: channelDetails?.name || v.channelName,
+                        channelAvatarUrl: channelDetails?.avatarUrl || v.channelAvatarUrl,
+                        channelId: channelDetails?.id || v.channelId
+                    }));
+                    setVideos(prev => pageToken && pageToken !== '1' ? [...prev, ...enrichedVideos] : enrichedVideos);
                     setVideosPageToken(vData.nextPageToken);
                     break;
                 case 'shorts':
                      if (shorts.length === 0) {
                         const sData = await getChannelShorts(channelId);
-                        setShorts(sData.videos);
+                         // Backfill channel info if missing
+                        const enrichedShorts = sData.videos.map(v => ({
+                            ...v,
+                            channelName: channelDetails?.name || v.channelName,
+                            channelAvatarUrl: channelDetails?.avatarUrl || v.channelAvatarUrl,
+                            channelId: channelDetails?.id || v.channelId
+                        }));
+                        setShorts(enrichedShorts);
                     }
                     break;
                 case 'playlists':
@@ -103,7 +117,7 @@ const ChannelPage: React.FC = () => {
             setIsTabLoading(false);
             setIsFetchingMore(false);
         }
-    }, [channelId, isFetchingMore, shorts.length, playlists.length]);
+    }, [channelId, isFetchingMore, shorts.length, playlists.length, channelDetails]);
     
     useEffect(() => {
         if (channelId && !isLoading) { // Ensure channel details are loaded before fetching tab data

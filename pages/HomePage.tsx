@@ -43,7 +43,19 @@ const HomePage: React.FC = () => {
         try {
             // Increase fetch sources from user's context
             const searchPromises = searchHistory.slice(0, 10).map(term => searchVideos(term).then(res => res.videos));
-            const channelPromises = subscribedChannels.slice(0, 15).map(channel => getChannelVideos(channel.id).then(res => res.videos.slice(0, 10)));
+            
+            // Fetch from subscribed channels and explicitly backfill channel info from our subscription list
+            // This ensures that even if the API returns "N/A" or missing avatars, we display the correct info.
+            const channelPromises = subscribedChannels.slice(0, 15).map(channel => 
+                getChannelVideos(channel.id).then(res => 
+                    res.videos.slice(0, 10).map(video => ({
+                        ...video,
+                        channelName: channel.name,
+                        channelAvatarUrl: channel.avatarUrl,
+                        channelId: channel.id
+                    }))
+                )
+            );
 
             const results = await Promise.allSettled([...searchPromises, ...channelPromises]);
             let personalizedVideos = results.flatMap(result => (result.status === 'fulfilled' && Array.isArray(result.value) ? result.value : []));

@@ -172,13 +172,24 @@ app.get('/api/channel', async (req, res) => {
         break;
       }
     }
+    
+    // Extract metadata with fallbacks
+    const title = channel.metadata?.title || channel.header?.title?.text || null;
+    const avatar = channel.metadata?.avatar || channel.header?.avatar || null;
+    const banner = channel.metadata?.banner || channel.header?.banner || null;
+
     res.status(200).json({
       channel: {
-        id: channel.id, name: channel.metadata?.title || null, description: channel.metadata?.description || null,
-        avatar: channel.metadata?.avatar || null, banner: channel.metadata?.banner || null,
-        subscriberCount: channel.metadata?.subscriber_count?.pretty || '非公開', videoCount: channel.metadata?.videos_count?.text ?? channel.metadata?.videos_count ?? '0'
+        id: channel.id, 
+        name: title, 
+        description: channel.metadata?.description || null,
+        avatar: avatar, 
+        banner: banner,
+        subscriberCount: channel.metadata?.subscriber_count?.pretty || '非公開', 
+        videoCount: channel.metadata?.videos_count?.text ?? channel.metadata?.videos_count ?? '0'
       },
-      page: parseInt(page), videos: videosFeed.videos || []
+      page: parseInt(page), 
+      videos: videosFeed.videos || []
     });
   } catch (err) { console.error('Error in /api/channel:', err); res.status(500).json({ error: err.message }); }
 });

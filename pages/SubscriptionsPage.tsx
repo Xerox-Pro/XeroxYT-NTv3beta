@@ -29,13 +29,30 @@ const SubscriptionsPage: React.FC = () => {
             let fetchedVideos: Video[] = [];
             if (selectedChannelId === 'all') {
                 const channelPromises = subscribedChannels.slice(0, 10).map(channel => 
-                    getChannelVideos(channel.id).then(res => res.videos.slice(0, 5))
+                    getChannelVideos(channel.id).then(res => 
+                        res.videos.slice(0, 5).map(video => ({
+                            ...video,
+                            channelName: channel.name,
+                            channelAvatarUrl: channel.avatarUrl,
+                            channelId: channel.id
+                        }))
+                    )
                 );
                 const results = await Promise.all(channelPromises);
                 fetchedVideos = results.flat();
             } else {
                 const result = await getChannelVideos(selectedChannelId);
-                fetchedVideos = result.videos;
+                const channel = subscribedChannels.find(c => c.id === selectedChannelId);
+                if (channel) {
+                     fetchedVideos = result.videos.map(video => ({
+                        ...video,
+                        channelName: channel.name,
+                        channelAvatarUrl: channel.avatarUrl,
+                        channelId: channel.id
+                    }));
+                } else {
+                    fetchedVideos = result.videos;
+                }
             }
             
             const uniqueVideos = Array.from(new Map(fetchedVideos.map(v => [v.id, v])).values());
