@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getChannelDetails, getChannelVideos, getChannelHome, mapHomeVideoToVideo } from '../utils/api';
@@ -296,8 +295,10 @@ const ChannelPage: React.FC = () => {
         }
     };
 
-    // Prioritize homeData for display if available
-    const displayBanner = homeData?.banner || channelDetails.bannerUrl;
+    // Prioritize homeData banner but fallback to extracted channel details banner.
+    // Ensure we check for non-empty strings.
+    const displayBanner = (homeData?.banner && homeData.banner.trim() !== "") ? homeData.banner : channelDetails.bannerUrl;
+    
     const displayAvatar = homeData?.avatar || channelDetails.avatarUrl;
     const displayName = homeData?.title || channelDetails.name;
     const displayDescription = homeData?.description || channelDetails.description;

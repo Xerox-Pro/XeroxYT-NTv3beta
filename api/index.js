@@ -16,7 +16,6 @@ const createYoutube = async () => {
   return await Innertube.create({ 
     lang: "ja", 
     location: "JP",
-    // 署名エラー対策: キャッシュを使用しない設定にする場合などがあればここに記述
   });
 };
 
@@ -41,25 +40,18 @@ app.get('/api/video', async (req, res) => {
     addCandidates(info.watch_next_feed);
     addCandidates(info.related_videos);
     
-    // 署名エラーが出てもメタデータは返せるようにする
     try {
-      // 関連動画の続きを取得（失敗してもメイン情報は返す）
       let continuationCount = 0;
-      // 現在のFeedを保持
       let currentFeed = info; 
-      
-      // すでに取得済みのIDを記録
       const seenIds = new Set();
       const relatedVideos = [];
       const MAX_VIDEOS = 50;
 
-      // 既存候補から抽出
       for (const video of allCandidates) {
          if(video.id) seenIds.add(video.id);
          relatedVideos.push(video);
       }
 
-      // 足りなければ続きを取得
       while (relatedVideos.length < MAX_VIDEOS && continuationCount < 2) {
           if (typeof currentFeed.getWatchNextContinuation === 'function') {
               currentFeed = await currentFeed.getWatchNextContinuation();
@@ -77,15 +69,12 @@ app.get('/api/video', async (req, res) => {
           }
           continuationCount++;
       }
-      
-      // 整形したリストを上書き
       info.watch_next_feed = relatedVideos;
 
     } catch (e) {
       console.warn('[API] Continuation failed, returning basic info:', e.message);
     }
 
-    // 不要なデータを削減してレスポンス
     if (info.secondary_info) info.secondary_info.watch_next_feed = [];
     info.related_videos = [];
     info.related = [];
@@ -104,18 +93,54 @@ app.get('/api/video', async (req, res) => {
 app.get('/api/search', async (req, res) => {
   try {
     const youtube = await createYoutube();
-    const { q: query } = req.query;
+    const { q: query, page = '1' } = req.query;
     if (!query) return res.status(400).json({ error: "Missing search query" });
 
-    const search = await youtube.search(query);
+    const targetPage = parseInt(page);
+    const ITEMS_PER_PAGE = 50; // ユーザーリクエストにより50件に設定
     
-    // v9以降は .videos, .shorts などがgetterとして用意されていることが多い
-    // ない場合は raw データを返す
+    let search = await youtube.search(query);
+    
+    let allVideos = [...(search.videos || [])];
+    let allShorts = [...(search.shorts || [])];
+    let allChannels = [...(search.channels || [])];
+    let allPlaylists = [...(search.playlists || [])];
+
+    // 指定ページ分までデータを確保するために続きを取得
+    const requiredCount = targetPage * ITEMS_PER_PAGE;
+    
+    let continuationAttempts = 0;
+    // 50件ずつ取得しようとすると回数が必要になるため、制限を緩める
+    const MAX_ATTEMPTS = 20;
+
+    while (allVideos.length < requiredCount && search.has_continuation && continuationAttempts < MAX_ATTEMPTS) {
+        search = await search.getContinuation();
+        if (search.videos) allVideos.push(...search.videos);
+        if (search.shorts) allShorts.push(...search.shorts);
+        if (search.channels) allChannels.push(...search.channels);
+        if (search.playlists) allPlaylists.push(...search.playlists);
+        continuationAttempts++;
+    }
+
+    const startIndex = (targetPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+
+    const pagedVideos = allVideos.slice(startIndex, endIndex);
+    
+    // 2ページ目以降は動画のみ返す（重複防止とパフォーマンスのため）
+    const pagedShorts = targetPage === 1 ? allShorts : [];
+    const pagedChannels = targetPage === 1 ? allChannels : [];
+    const pagedPlaylists = targetPage === 1 ? allPlaylists : [];
+
+    // まだ動画が残っているか、続きが取得可能なら次ページありとする
+    const hasMore = allVideos.length > endIndex || search.has_continuation;
+
     res.status(200).json({
-        videos: search.videos || [],
-        shorts: search.shorts || [],
-        channels: search.channels || [],
-        playlists: search.playlists || []
+        videos: pagedVideos,
+        shorts: pagedShorts,
+        channels: pagedChannels,
+        playlists: pagedPlaylists,
+        nextPageToken: hasMore ? String(targetPage + 1) : undefined
     });
   } catch (err) { 
       console.error('Error in /api/search:', err); 
@@ -136,7 +161,6 @@ app.get('/api/comments', async (req, res) => {
     let commentsSection = await youtube.getComments(id);
     let allComments = commentsSection.contents || [];
     
-    // 続きのコメントを取得
     let attempts = 0;
     while (allComments.length < limit && commentsSection.has_continuation && attempts < 5) {
       commentsSection = await commentsSection.getContinuation();
@@ -168,7 +192,7 @@ app.get('/api/comments', async (req, res) => {
 });
 
 // -------------------------------------------------------------------
-// チャンネル API (/api/channel) - 【重要】修正箇所
+// チャンネル API (/api/channel)
 // -------------------------------------------------------------------
 app.get('/api/channel', async (req, res) => {
   try {
@@ -178,20 +202,13 @@ app.get('/api/channel', async (req, res) => {
 
     const channel = await youtube.getChannel(id);
     
-    // 最初の動画リストを取得
     let videosFeed = await channel.getVideos();
-    
-    // 動画を蓄積するための配列を用意（videosFeed.videosは読み取り専用なので上書きしない）
     let allVideos = [...(videosFeed.videos || [])];
 
-    // ページネーション処理
     const targetPage = parseInt(page);
-    // 1ページ目は既に取得しているので、2ページ目以降を取得
     for (let i = 1; i < targetPage; i++) {
       if (videosFeed.has_continuation) {
-        // 次のフィードを取得して更新
         videosFeed = await videosFeed.getContinuation();
-        // 新しい動画を追加
         if (videosFeed.videos) {
             allVideos.push(...videosFeed.videos);
         }
@@ -200,23 +217,23 @@ app.get('/api/channel', async (req, res) => {
       }
     }
     
-    // メタデータの抽出
     const title = channel.metadata?.title || channel.header?.title?.text || channel.header?.author?.name || null;
     let avatar = channel.metadata?.avatar || channel.header?.avatar || channel.header?.author?.thumbnails || null;
     
-    // アバターURLの正規化
     if (Array.isArray(avatar) && avatar.length > 0) {
         avatar = avatar[0].url;
     } else if (typeof avatar === 'object' && avatar?.url) {
         avatar = avatar.url;
     }
 
-    // バナーURLの正規化
+    // バナー抽出ロジックの強化
     let banner = channel.metadata?.banner || channel.header?.banner || null;
     if (Array.isArray(banner) && banner.length > 0) {
         banner = banner[0].url;
     } else if (typeof banner === 'object' && banner?.url) {
         banner = banner.url;
+    } else if (typeof banner !== 'string') {
+        banner = null; 
     }
 
     res.status(200).json({
@@ -230,13 +247,33 @@ app.get('/api/channel', async (req, res) => {
         videoCount: channel.metadata?.videos_count?.text ?? channel.metadata?.videos_count ?? '0'
       },
       page: targetPage, 
-      videos: allVideos // 蓄積した配列を返す
+      videos: allVideos
     });
 
   } catch (err) { 
       console.error('Error in /api/channel:', err); 
-      // エラーでもJSONを返せるようにする
       res.status(500).json({ error: err.message }); 
+  }
+});
+
+// -------------------------------------------------------------------
+// チャンネルホーム Proxy API (/api/channel-home-proxy)
+// -------------------------------------------------------------------
+app.get('/api/channel-home-proxy', async (req, res) => {
+  try {
+    const { id } = req.query;
+    if (!id) return res.status(400).json({ error: "Missing channel id" });
+
+    // 外部APIからデータを取得
+    const response = await fetch(`https://siawaseok.duckdns.org/api/channel/${id}`);
+    if (!response.ok) {
+        return res.status(response.status).json({ error: "Failed to fetch from external API" });
+    }
+    const data = await response.json();
+    res.status(200).json(data);
+  } catch (err) {
+      console.error('Error in /api/channel-home-proxy:', err);
+      res.status(500).json({ error: err.message });
   }
 });
 
@@ -252,14 +289,11 @@ app.get('/api/channel-shorts', async (req, res) => {
     const channel = await youtube.getChannel(id);
     const shortsFeed = await channel.getShorts();
     
-    // .videos getter が存在する場合はそれを使う（バージョンによる互換性確保）
-    // 存在しない場合は contents[0].contents 等の深いネストを探す
     let shorts = [];
     
     if (shortsFeed.videos) {
         shorts = shortsFeed.videos;
     } else if (shortsFeed.contents && Array.isArray(shortsFeed.contents)) {
-        // Tab -> RichGrid -> contents のような構造を想定
         const tabContent = shortsFeed.contents[0];
         if (tabContent && tabContent.contents) {
             shorts = tabContent.contents;
@@ -287,15 +321,12 @@ app.get('/api/channel-playlists', async (req, res) => {
     
     let playlists = [];
     
-    // .playlists getter がある場合
     if (playlistsFeed.playlists) {
         playlists = playlistsFeed.playlists;
     } 
-    // .items getter がある場合
     else if (playlistsFeed.items) {
         playlists = playlistsFeed.items;
     }
-    // 構造を手動で掘る場合
     else if (playlistsFeed.contents && Array.isArray(playlistsFeed.contents)) {
         const tabContent = playlistsFeed.contents[0];
         if (tabContent && tabContent.contents) {

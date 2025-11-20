@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { getVideoDetails, getPlayerConfig, getComments, getVideosByIds } from '../utils/api';
@@ -7,7 +6,6 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { useHistory } from '../contexts/HistoryContext';
 import { usePlaylist } from '../contexts/PlaylistContext';
 import VideoPlayerPageSkeleton from '../components/skeletons/VideoPlayerPageSkeleton';
-import RelatedVideoCard from '../components/RelatedVideoCard';
 import PlaylistModal from '../components/PlaylistModal';
 import CommentComponent from '../components/Comment';
 import PlaylistPanel from '../components/PlaylistPanel';
@@ -163,9 +161,6 @@ const VideoPlayerPage: React.FC = () => {
                         <p>{error}</p>
                     </div>
                 </div>
-                <div className="lg:w-1/3 lg:max-w-sm flex-shrink-0">
-                    <div className="bg-yt-light dark:bg-yt-dark-gray p-4 rounded-xl text-center"><p className="font-semibold">関連動画の読み込みに失敗しました。</p></div>
-                </div>
             </div>
         );
     }
@@ -189,8 +184,8 @@ const VideoPlayerPage: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-col lg:flex-row gap-6 max-w-[1700px] mx-auto">
-            <div className="flex-grow lg:w-2/3">
+        <div className={`flex flex-col lg:flex-row gap-6 ${currentPlaylist ? 'max-w-[1700px]' : 'max-w-5xl'} mx-auto`}>
+            <div className={`${currentPlaylist ? 'flex-grow lg:w-2/3' : 'w-full'}`}>
                 {/* Player Container */}
                 <div className="aspect-video bg-yt-black rounded-xl overflow-hidden shadow-lg">
                     <iframe src={iframeSrc} key={iframeSrc} title={videoDetails.title} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
@@ -290,20 +285,13 @@ const VideoPlayerPage: React.FC = () => {
                 </div>
             </div>
             
-            {/* Secondary Column: Recommendations / Playlist */}
-            <div className="lg:w-1/3 lg:max-w-[400px] flex-shrink-0">
-                {currentPlaylist && videoId ? (
-                    <PlaylistPanel playlist={currentPlaylist} authorName={currentPlaylist.authorName} videos={playlistVideos} currentVideoId={videoId} isShuffle={isShuffle} isLoop={isLoop} toggleShuffle={toggleShuffle} toggleLoop={toggleLoop} onReorder={handlePlaylistReorder} />
-                ) : (
-                    videoDetails.relatedVideos.length > 0 && (
-                        <div className="flex flex-col space-y-2">
-                            {videoDetails.relatedVideos.map(video => (
-                                <RelatedVideoCard key={video.id} video={video} />
-                            ))}
-                        </div>
-                    )
-                )}
-            </div>
+            {/* Secondary Column: Playlist Panel Only */}
+            {currentPlaylist && videoId && (
+                <div className="lg:w-1/3 lg:max-w-[400px] flex-shrink-0">
+                     <PlaylistPanel playlist={currentPlaylist} authorName={currentPlaylist.authorName} videos={playlistVideos} currentVideoId={videoId} isShuffle={isShuffle} isLoop={isLoop} toggleShuffle={toggleShuffle} toggleLoop={toggleLoop} onReorder={handlePlaylistReorder} />
+                </div>
+            )}
+            
             {isPlaylistModalOpen && (
                 <PlaylistModal isOpen={isPlaylistModalOpen} onClose={() => setIsPlaylistModalOpen(false)} video={videoForPlaylistModal} />
             )}

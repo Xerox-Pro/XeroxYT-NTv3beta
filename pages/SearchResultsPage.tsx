@@ -18,38 +18,61 @@ const SearchResultsPage: React.FC = () => {
     
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    
+    const [nextPageToken, setNextPageToken] = useState<string | undefined>(undefined);
+    const [isFetchingMore, setIsFetchingMore] = useState(false);
 
-    const performSearch = useCallback(async (searchQuery: string) => {
+    const performSearch = useCallback(async (searchQuery: string, pageToken: string = '1') => {
         if (!searchQuery) return;
         
-        setError(null);
-        setIsLoading(true);
+        if (pageToken === '1') {
+            setError(null);
+            setIsLoading(true);
+        } else {
+            setIsFetchingMore(true);
+        }
         
         try {
-            const results = await searchVideos(searchQuery);
-            setVideos(results.videos);
-            setShorts(results.shorts);
-            setChannels(results.channels);
-            setPlaylists(results.playlists);
+            const results = await searchVideos(searchQuery, pageToken);
+            
+            if (pageToken === '1') {
+                setVideos(results.videos);
+                setShorts(results.shorts);
+                setChannels(results.channels);
+                setPlaylists(results.playlists);
+            } else {
+                setVideos(prev => [...prev, ...results.videos]);
+            }
+            setNextPageToken(results.nextPageToken);
         } catch (err: any) {
             setError(err.message);
             console.error(err);
         } finally {
             setIsLoading(false);
+            setIsFetchingMore(false);
         }
     }, []);
 
     useEffect(() => {
+        // Reset state on new query
         setVideos([]);
         setShorts([]);
         setChannels([]);
         setPlaylists([]);
+        setNextPageToken(undefined);
+        
         if (query) {
-            performSearch(query);
+            performSearch(query, '1');
         } else {
             setIsLoading(false);
         }
     }, [query, performSearch]);
+
+    const handleLoadMore = () => {
+        if (query && nextPageToken && !isFetchingMore) {
+            performSearch(query, nextPageToken);
+        }
+    };
 
     if (isLoading) {
         return (
@@ -69,7 +92,7 @@ const SearchResultsPage: React.FC = () => {
         );
     }
     
-    if (error) {
+    if (error && videos.length === 0) {
         return <div className="text-center text-red-500 bg-red-100 dark:bg-red-900/50 p-4 rounded-lg">{error}</div>;
     }
 
@@ -115,6 +138,19 @@ const SearchResultsPage: React.FC = () => {
                     <SearchVideoResultCard key={`${video.id}-${index}`} video={video} />
                 ))}
             </div>
+
+            {/* Load More Button */}
+            {nextPageToken && (
+                <div className="flex justify-center mt-8 mb-10">
+                    <button 
+                        onClick={handleLoadMore} 
+                        disabled={isFetchingMore}
+                        className="px-8 py-2 bg-yt-light dark:bg-yt-dark-gray rounded-full hover:bg-yt-spec-light-20 dark:hover:bg-yt-spec-20 font-medium transition-colors disabled:opacity-50"
+                    >
+                        {isFetchingMore ? '読み込み中...' : 'もっと見る'}
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

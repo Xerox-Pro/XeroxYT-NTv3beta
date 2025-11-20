@@ -1,4 +1,3 @@
-
 import type { Video, VideoDetails, Channel, ChannelDetails, ApiPlaylist, Comment, PlaylistDetails, SearchResults, HomeVideo, HomePlaylist, ChannelHomeData } from '../types';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ja';
@@ -156,15 +155,15 @@ export const mapHomeVideoToVideo = (homeVideo: HomeVideo, channelData?: Partial<
 export async function getChannelHome(channelId: string): Promise<ChannelHomeData> {
     const useProxy = localStorage.getItem('useChannelHomeProxy') !== 'false';
     
-    if (!useProxy) {
-        throw new Error("Proxy is disabled");
+    if (useProxy) {
+        return await apiFetch(`channel-home-proxy?id=${channelId}`);
+    } else {
+        const response = await fetch(`https://siawaseok.duckdns.org/api/channel/${channelId}`);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch channel home data: ${response.status}`);
+        }
+        return await response.json();
     }
-
-    const response = await fetch(`https://siawaseok.duckdns.org/api/channel/${channelId}`);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch channel home data: ${response.status}`);
-    }
-    return await response.json();
 }
 
 // --- EXPORTED API FUNCTIONS ---
@@ -175,9 +174,9 @@ export async function getRecommendedVideos(): Promise<{ videos: Video[] }> {
     return { videos };
 }
 
-// Updated searchVideos to return all categories
-export async function searchVideos(query: string, pageToken = '', channelId?: string): Promise<SearchResults> {
-    const data = await apiFetch(`search?q=${encodeURIComponent(query)}&limit=50`);
+// Updated searchVideos to accept page token and return filtered results
+export async function searchVideos(query: string, pageToken = '1', channelId?: string): Promise<SearchResults> {
+    const data = await apiFetch(`search?q=${encodeURIComponent(query)}&page=${pageToken}`);
     
     const videos: Video[] = Array.isArray(data.videos) ? data.videos.map(mapYoutubeiVideoToVideo).filter((v): v is Video => v !== null) : [];
     const shorts: Video[] = Array.isArray(data.shorts) ? data.shorts.map(mapYoutubeiVideoToVideo).filter((v): v is Video => v !== null) : [];
@@ -188,7 +187,7 @@ export async function searchVideos(query: string, pageToken = '', channelId?: st
     if (channelId) {
         filteredVideos = videos.filter(v => v.channelId === channelId);
     }
-    return { videos: filteredVideos, shorts, channels, playlists, nextPageToken: undefined };
+    return { videos: filteredVideos, shorts, channels, playlists, nextPageToken: data.nextPageToken };
 }
 
 export async function getVideoDetails(videoId: string): Promise<VideoDetails> {

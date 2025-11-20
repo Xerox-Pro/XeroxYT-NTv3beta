@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { MenuIcon, YouTubeLogo, SearchIcon, BellIcon, LightbulbIcon, MoonIcon, SettingsIcon } from './icons/Icons';
+import { MenuIcon, YouTubeLogo, SearchIcon, BellIcon, LightbulbIcon, MoonIcon } from './icons/Icons';
 import { useNotification } from '../contexts/NotificationContext';
 import { useSearchHistory } from '../contexts/SearchHistoryContext';
 import NotificationDropdown from './NotificationDropdown';
@@ -49,6 +48,9 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, theme, toggleTheme }) =>
       const newValue = !useProxy;
       setUseProxy(newValue);
       localStorage.setItem('useChannelHomeProxy', String(newValue));
+      // 設定変更を反映するためにリロードを促すか、状態だけで管理するかですが
+      // api.tsがlocalStorageを読み込むタイミング次第。
+      // ここではリロードして確実に反映させます。
       window.location.reload();
   };
 
