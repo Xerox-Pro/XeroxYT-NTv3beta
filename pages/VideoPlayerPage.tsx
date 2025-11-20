@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { getVideoDetails, getPlayerConfig, getComments, getVideosByIds, getStreamUrls } from '../utils/api';
+import { getVideoDetails, getPlayerConfig, getComments, getVideosByIds } from '../utils/api';
 import type { VideoDetails, Video, Comment } from '../types';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useHistory } from '../contexts/HistoryContext';
@@ -10,7 +11,6 @@ import RelatedVideoCard from '../components/RelatedVideoCard';
 import PlaylistModal from '../components/PlaylistModal';
 import CommentComponent from '../components/Comment';
 import PlaylistPanel from '../components/PlaylistPanel';
-import StreamingPlayer from '../components/StreamingPlayer';
 import { LikeIcon, SaveIcon, MoreIconHorizontal } from '../components/icons/Icons';
 
 const VideoPlayerPage: React.FC = () => {
@@ -27,11 +27,6 @@ const VideoPlayerPage: React.FC = () => {
     const [playerParams, setPlayerParams] = useState<string | null>(null);
     const [playlistVideos, setPlaylistVideos] = useState<Video[]>([]);
     
-    const [playerType, setPlayerType] = useState<'edu' | 'stream'>('edu');
-    const [streamUrls, setStreamUrls] = useState<{ video_url: string; audio_url?: string } | null>(null);
-    const [isLoadingStream, setIsLoadingStream] = useState(false);
-    const [streamError, setStreamError] = useState<string | null>(null);
-
     const [isShuffle, setIsShuffle] = useState(searchParams.get('shuffle') === '1');
     const [isLoop, setIsLoop] = useState(searchParams.get('loop') === '1');
 
@@ -82,9 +77,6 @@ const VideoPlayerPage: React.FC = () => {
             setError(null);
             setVideoDetails(null);
             setComments([]);
-            setPlayerType('edu');
-            setStreamUrls(null);
-            setStreamError(null);
             window.scrollTo(0, 0);
 
             try {
@@ -107,27 +99,6 @@ const VideoPlayerPage: React.FC = () => {
         fetchVideoData();
     }, [videoId, addVideoToHistory]);
     
-    useEffect(() => {
-        if (playerType === 'stream' && videoId && !streamUrls && !streamError) {
-          const fetchStreamUrls = async () => {
-            setIsLoadingStream(true);
-            try {
-              const urls = await getStreamUrls(videoId);
-              setStreamUrls(urls);
-              if (urls.video_url) {
-                window.open(urls.video_url, '_blank');
-              }
-            } catch (err: any) {
-              setStreamError(err.message || 'ストリームURLの取得に失敗しました。');
-              console.error(err);
-            } finally {
-              setIsLoadingStream(false);
-            }
-          };
-          fetchStreamUrls();
-        }
-      }, [playerType, videoId, streamUrls, streamError]);
-
     const shuffledPlaylistVideos = useMemo(() => {
         if (!isShuffle || playlistVideos.length === 0) return playlistVideos;
         const currentIndex = playlistVideos.findIndex(v => v.id === videoId);
@@ -222,20 +193,7 @@ const VideoPlayerPage: React.FC = () => {
             <div className="flex-grow lg:w-2/3">
                 {/* Player Container */}
                 <div className="aspect-video bg-yt-black rounded-xl overflow-hidden shadow-lg">
-                    {playerType === 'edu' ? (
-                        <iframe src={iframeSrc} key={iframeSrc} title={videoDetails.title} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
-                    ) : (
-                        <>
-                            {isLoadingStream && (
-                                <div className="w-full h-full flex flex-col justify-center items-center text-white">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yt-blue"></div>
-                                    <p className="mt-4">ストリームを準備中...</p>
-                                </div>
-                            )}
-                            {streamError && <div className="w-full h-full flex justify-center items-center text-red-400 bg-red-900/50 p-4">{streamError}</div>}
-                            {streamUrls && <StreamingPlayer videoUrl={streamUrls.video_url} audioUrl={streamUrls.audio_url} />}
-                        </>
-                    )}
+                    <iframe src={iframeSrc} key={iframeSrc} title={videoDetails.title} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
                 </div>
 
                 {/* Title */}
@@ -334,22 +292,6 @@ const VideoPlayerPage: React.FC = () => {
             
             {/* Secondary Column: Recommendations / Playlist */}
             <div className="lg:w-1/3 lg:max-w-[400px] flex-shrink-0">
-                {/* Player Type Switcher (moved here for better layout) */}
-                <div className="flex items-center space-x-2 mb-4 overflow-x-auto pb-2">
-                     <button
-                        onClick={() => setPlayerType('edu')}
-                        className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors whitespace-nowrap ${playerType === 'edu' ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-yt-light dark:bg-[#272727] hover:bg-[#e5e5e5] dark:hover:bg-[#3f3f3f]'}`}
-                    >
-                        すべて
-                    </button>
-                    <button
-                        onClick={() => setPlayerType('stream')}
-                         className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors whitespace-nowrap ${playerType === 'stream' ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-yt-light dark:bg-[#272727] hover:bg-[#e5e5e5] dark:hover:bg-[#3f3f3f]'}`}
-                    >
-                        関連動画
-                    </button>
-                </div>
-
                 {currentPlaylist && videoId ? (
                     <PlaylistPanel playlist={currentPlaylist} authorName={currentPlaylist.authorName} videos={playlistVideos} currentVideoId={videoId} isShuffle={isShuffle} isLoop={isLoop} toggleShuffle={toggleShuffle} toggleLoop={toggleLoop} onReorder={handlePlaylistReorder} />
                 ) : (

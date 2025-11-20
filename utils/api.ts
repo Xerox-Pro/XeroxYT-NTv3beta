@@ -154,6 +154,12 @@ export const mapHomeVideoToVideo = (homeVideo: HomeVideo, channelData?: Partial<
 };
 
 export async function getChannelHome(channelId: string): Promise<ChannelHomeData> {
+    const useProxy = localStorage.getItem('useChannelHomeProxy') !== 'false';
+    
+    if (!useProxy) {
+        throw new Error("Proxy is disabled");
+    }
+
     const response = await fetch(`https://siawaseok.duckdns.org/api/channel/${channelId}`);
     if (!response.ok) {
         throw new Error(`Failed to fetch channel home data: ${response.status}`);

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { MenuIcon, YouTubeLogo, SearchIcon, BellIcon, LightbulbIcon, MoonIcon, MicIcon, VideoPlusIcon } from './icons/Icons';
+import { MenuIcon, YouTubeLogo, SearchIcon, BellIcon, LightbulbIcon, MoonIcon, SettingsIcon } from './icons/Icons';
 import { useNotification } from '../contexts/NotificationContext';
 import { useSearchHistory } from '../contexts/SearchHistoryContext';
 import NotificationDropdown from './NotificationDropdown';
@@ -15,10 +15,14 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ toggleSidebar, theme, toggleTheme }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [useProxy, setUseProxy] = useState(localStorage.getItem('useChannelHomeProxy') !== 'false');
+
   const { notifications, unreadCount, markAsRead } = useNotification();
   const { addSearchTerm } = useSearchHistory();
   const navigate = useNavigate();
   const notificationRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,15 +34,31 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, theme, toggleTheme }) =>
 
   const handleBellClick = () => {
     setIsNotificationOpen(prev => !prev);
+    setIsUserMenuOpen(false);
     if (!isNotificationOpen && unreadCount > 0) {
         markAsRead();
     }
+  };
+  
+  const handleUserIconClick = () => {
+      setIsUserMenuOpen(prev => !prev);
+      setIsNotificationOpen(false);
+  };
+
+  const toggleProxy = () => {
+      const newValue = !useProxy;
+      setUseProxy(newValue);
+      localStorage.setItem('useChannelHomeProxy', String(newValue));
+      window.location.reload();
   };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
         if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
             setIsNotificationOpen(false);
+        }
+        if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+            setIsUserMenuOpen(false);
         }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -86,17 +106,11 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, theme, toggleTheme }) =>
                 <SearchIcon />
             </button>
           </div>
-          <button type="button" className="hidden sm:flex flex-shrink-0 items-center justify-center w-10 h-10 rounded-full bg-yt-light dark:bg-[#181818] hover:bg-[#e5e5e5] dark:hover:bg-[#303030] transition-colors">
-            <MicIcon />
-          </button>
         </form>
       </div>
 
       {/* Right Section */}
       <div className="flex items-center space-x-2 sm:space-x-4">
-        <button className="hidden md:block p-2 rounded-full hover:bg-yt-spec-light-10 dark:hover:bg-yt-spec-10">
-            <VideoPlusIcon />
-        </button>
         <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-yt-spec-light-10 dark:hover:bg-yt-spec-10 active:scale-95 transform transition-transform duration-150" aria-label="テーマの切り替え">
           {theme === 'light' ? <MoonIcon /> : <LightbulbIcon />}
         </button>
@@ -111,9 +125,41 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, theme, toggleTheme }) =>
             </button>
             {isNotificationOpen && <NotificationDropdown notifications={notifications} onClose={() => setIsNotificationOpen(false)} />}
         </div>
-        <button className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm" aria-label="ユーザーアカウント">
-          X
-        </button>
+        
+        <div className="relative" ref={userMenuRef}>
+            <button 
+                onClick={handleUserIconClick}
+                className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm active:scale-95 transform transition-transform duration-150" 
+                aria-label="ユーザーアカウント"
+            >
+            X
+            </button>
+            
+            {isUserMenuOpen && (
+                <div className="absolute top-12 right-0 w-60 bg-yt-white dark:bg-yt-light-black rounded-lg shadow-lg border border-yt-spec-light-20 dark:border-yt-spec-20 py-2 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-yt-spec-light-20 dark:border-yt-spec-20">
+                        <p className="text-sm font-bold text-black dark:text-white">User</p>
+                        <p className="text-xs text-yt-light-gray">@user</p>
+                    </div>
+                    <div className="py-2">
+                        <label className="flex items-center justify-between px-4 py-2 hover:bg-yt-spec-light-10 dark:hover:bg-yt-spec-10 cursor-pointer">
+                            <span className="text-sm text-black dark:text-white">Proxy経由で取得</span>
+                            <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                <input 
+                                    type="checkbox" 
+                                    name="toggle" 
+                                    id="toggle" 
+                                    className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer checked:right-0 right-5"
+                                    checked={useProxy}
+                                    onChange={toggleProxy}
+                                />
+                                <div className={`toggle-label block overflow-hidden h-5 rounded-full cursor-pointer ${useProxy ? 'bg-yt-blue' : 'bg-yt-light-gray'}`}></div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            )}
+        </div>
       </div>
     </header>
   );

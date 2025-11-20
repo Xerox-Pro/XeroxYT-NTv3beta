@@ -95,7 +95,7 @@ const ChannelPage: React.FC = () => {
         } catch (err) {
             console.error(`Failed to load ${tab}`, err);
             if(tab === 'home') {
-                // Don't show critical error for home tab failure, just show empty
+                // Don't show critical error for home tab failure, just show empty or log it
                 console.warn("Home tab fetch failed, staying empty.");
             } else {
                 setError(`[${tab}] タブの読み込みに失敗しました。`);
@@ -154,7 +154,10 @@ const ChannelPage: React.FC = () => {
     );
 
     const renderHomeTab = () => {
-        if (!homeData) return <div className="p-8 text-center"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-yt-blue mx-auto"></div></div>;
+        if (!homeData) {
+             // If user disabled proxy or loading failed gracefully
+             return <div className="p-8 text-center text-yt-light-gray">ホームコンテンツを表示できません。Proxy設定を確認してください。</div>;
+        }
         
         return (
             <div className="flex flex-col gap-10 pb-10">
@@ -208,8 +211,8 @@ const ChannelPage: React.FC = () => {
                         
                         <HorizontalScrollContainer>
                              {playlist.items.map(item => {
+                                // Check if the item is a channel based on ID format (UC...)
                                 if (item.videoId.startsWith('UC')) {
-                                    // This is a Channel Link
                                     const iconUrl = item.icon?.startsWith('//') ? `https:${item.icon}` : item.icon;
                                     return (
                                         <Link key={item.videoId} to={`/channel/${item.videoId}`} className="flex-shrink-0 w-32 sm:w-40 flex flex-col items-center justify-start group p-2 snap-start">
@@ -293,12 +296,18 @@ const ChannelPage: React.FC = () => {
         }
     };
 
+    // Prioritize homeData for display if available
+    const displayBanner = homeData?.banner || channelDetails.bannerUrl;
+    const displayAvatar = homeData?.avatar || channelDetails.avatarUrl;
+    const displayName = homeData?.title || channelDetails.name;
+    const displayDescription = homeData?.description || channelDetails.description;
+
     return (
         <div className="max-w-[1284px] mx-auto px-4 sm:px-6 lg:px-8">
             {/* Banner */}
-            {channelDetails.bannerUrl && (
-                <div className="w-full aspect-[6/1] rounded-xl overflow-hidden mb-6">
-                    <img src={channelDetails.bannerUrl} alt={`${channelDetails.name} banner`} className="w-full h-full object-cover" />
+            {displayBanner && (
+                <div className="w-full aspect-[6/1] rounded-xl overflow-hidden mb-6 bg-yt-dark-gray">
+                    <img src={displayBanner} alt={`${displayName} banner`} className="w-full h-full object-cover" />
                 </div>
             )}
 
@@ -306,12 +315,12 @@ const ChannelPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row items-start mb-4">
                 {/* Avatar */}
                 <div className="mr-6 flex-shrink-0">
-                     <img src={channelDetails.avatarUrl} alt={channelDetails.name} className="w-24 h-24 sm:w-40 sm:h-40 rounded-full object-cover" />
+                     <img src={displayAvatar} alt={displayName} className="w-24 h-24 sm:w-40 sm:h-40 rounded-full object-cover" />
                 </div>
                 
                 {/* Info & Actions */}
                 <div className="flex-1 flex flex-col justify-center pt-2">
-                    <h1 className="text-2xl sm:text-4xl font-bold mb-2">{channelDetails.name}</h1>
+                    <h1 className="text-2xl sm:text-4xl font-bold mb-2">{displayName}</h1>
                     
                     <div className="text-sm text-yt-light-gray flex flex-wrap items-center gap-x-2 mb-3">
                         {channelDetails.handle && <span className="font-medium text-black dark:text-white">@{channelDetails.handle}</span>}
@@ -329,9 +338,9 @@ const ChannelPage: React.FC = () => {
                         )}
                     </div>
 
-                    {channelDetails.description && (
+                    {displayDescription && (
                         <p className="text-sm text-yt-light-gray mb-4 line-clamp-1 cursor-pointer hover:text-black dark:hover:text-white transition-colors max-w-3xl">
-                            {channelDetails.description.split('\n')[0]}
+                            {displayDescription.split('\n')[0]}
                              <span className="ml-1 font-semibold text-black dark:text-white">...他</span>
                         </p>
                     )}

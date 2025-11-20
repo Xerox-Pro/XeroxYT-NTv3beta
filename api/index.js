@@ -211,7 +211,13 @@ app.get('/api/channel', async (req, res) => {
         avatar = avatar.url;
     }
 
-    const banner = channel.metadata?.banner || channel.header?.banner || null;
+    // バナーURLの正規化
+    let banner = channel.metadata?.banner || channel.header?.banner || null;
+    if (Array.isArray(banner) && banner.length > 0) {
+        banner = banner[0].url;
+    } else if (typeof banner === 'object' && banner?.url) {
+        banner = banner.url;
+    }
 
     res.status(200).json({
       channel: {
