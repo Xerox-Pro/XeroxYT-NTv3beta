@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import VideoGrid from '../components/VideoGrid';
 import { getRecommendedVideos } from '../utils/api';
 import { useSubscription } from '../contexts/SubscriptionContext';
@@ -9,6 +9,7 @@ import { usePreference } from '../contexts/PreferenceContext';
 import { getDeeplyAnalyzedRecommendations } from '../utils/recommendation';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
 import type { Video } from '../types';
+import { SearchIcon } from '../components/icons/Icons';
 
 const HomePage: React.FC = () => {
     const [recommendedVideos, setRecommendedVideos] = useState<Video[]>([]);
@@ -22,6 +23,17 @@ const HomePage: React.FC = () => {
     const { history: watchHistory } = useHistory();
     const { preferredGenres, preferredChannels } = usePreference();
 
+    // ユーザーが「新規（データなし）」かどうかを判定
+    const isNewUser = useMemo(() => {
+        // デフォルトで1つのチャンネル(Xerox)が登録されているため、1より大きい場合を「ユーザーが登録した」とみなす
+        const hasSubscriptions = subscribedChannels.length > 1;
+        const hasSearchHistory = searchHistory.length > 0;
+        const hasWatchHistory = watchHistory.length > 0;
+        const hasPreferences = preferredGenres.length > 0 || preferredChannels.length > 0;
+
+        return !(hasSubscriptions || hasSearchHistory || hasWatchHistory || hasPreferences);
+    }, [subscribedChannels, searchHistory, watchHistory, preferredGenres, preferredChannels]);
+
     const loadRecommendations = useCallback(async (pageNum: number) => {
         const isInitial = pageNum === 1;
         if (isInitial) {
@@ -34,7 +46,6 @@ const HomePage: React.FC = () => {
             let newVideos: Video[] = [];
 
             // 深い分析に基づくレコメンデーションを取得
-            // ページ番号を渡すことで、異なる履歴や好みをローテーションして使用する
             const analyzedVideos = await getDeeplyAnalyzedRecommendations({
                 searchHistory,
                 watchHistory,
@@ -46,8 +57,7 @@ const HomePage: React.FC = () => {
 
             newVideos = [...analyzedVideos];
 
-            // フォールバック: 急上昇動画 (ページ1のみ、または結果が少ない場合)
-            // エラーが出ても無視して、可能な限り分析結果を表示する
+            // フォールバック: 分析結果が少ない場合のみ急上昇を取得（初回のみ）
             if (newVideos.length < 10 && isInitial) {
                 try {
                     const { videos: trendingVideos } = await getRecommendedVideos();
@@ -57,12 +67,9 @@ const HomePage: React.FC = () => {
                 }
             }
             
-            // IDでの重複排除（既存の動画とも比較）
             setRecommendedVideos(prev => {
                 const existingIds = new Set(prev.map(v => v.id));
                 const uniqueNewVideos = newVideos.filter(v => !existingIds.has(v.id));
-                
-                // 既存の動画 + 新しい動画
                 return isInitial ? uniqueNewVideos : [...prev, ...uniqueNewVideos];
             });
 
@@ -77,16 +84,21 @@ const HomePage: React.FC = () => {
         }
     }, [subscribedChannels, searchHistory, watchHistory, preferredGenres, preferredChannels]);
 
-    // 初期ロード (依存配列が変わった時のみリセット)
     useEffect(() => {
         setPage(1);
         setRecommendedVideos([]);
         setError(null);
-        loadRecommendations(1);
-    }, [preferredGenres, preferredChannels]); // 好みが変わったらリロード
+        
+        // データが何もない新規ユーザーの場合は、APIリクエストを行わずにガイドを表示する
+        if (isNewUser) {
+            setIsLoading(false);
+        } else {
+            loadRecommendations(1);
+        }
+    }, [isNewUser, preferredGenres, preferredChannels]);
 
     const loadMore = () => {
-        if (!isFetchingMore && !isLoading) {
+        if (!isFetchingMore && !isLoading && !isNewUser) {
             const nextPage = page + 1;
             setPage(nextPage);
             loadRecommendations(nextPage);
@@ -95,16 +107,19 @@ const HomePage: React.FC = () => {
 
     const lastElementRef = useInfiniteScroll(loadMore, true, isFetchingMore || isLoading);
 
-    // データがない場合（エラー時含む）は、ユーザーガイドを表示する
-    if (recommendedVideos.length === 0 && !isLoading) {
+    // 新規ユーザー、または動画がない場合のガイド表示
+    if ((isNewUser || (recommendedVideos.length === 0 && !isLoading))) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4 animate-fade-in">
-                <div className="mb-6 text-6xl">📺</div>
-                <h2 className="text-2xl font-bold mb-3 text-black dark:text-white">動画を視聴して、おすすめをカスタマイズ</h2>
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 animate-fade-in">
+                <div className="bg-yt-light dark:bg-yt-spec-10 p-6 rounded-full mb-6">
+                    <SearchIcon />
+                </div>
+                <h2 className="text-2xl font-bold mb-4 text-black dark:text-white">まずは動画を探してみましょう</h2>
                 <p className="text-yt-light-gray text-base max-w-lg mb-8 leading-relaxed">
-                    まだおすすめできる動画がありません。<br />
-                    検索バーから興味のある動画を探して視聴したり、チャンネル登録をすると、<br />
-                    ここにパーソナライズされた動画が表示されます。
+                    検索してチャンネル登録したり、動画を閲覧すると、<br />
+                    ここにあなたへのおすすめ動画が表示されるようになります。<br />
+                    <br />
+                    上の検索バーから、好きなキーワードで検索してみてください！
                 </p>
             </div>
         );
@@ -112,9 +127,9 @@ const HomePage: React.FC = () => {
 
     return (
         <div className="space-y-8">
+            {error && <div className="text-red-500 text-center mb-4">{error}</div>}
             <VideoGrid videos={recommendedVideos} isLoading={isLoading} />
             
-            {/* Infinite Scroll Sentinel */}
             {!isLoading && recommendedVideos.length > 0 && (
                 <div ref={lastElementRef} className="h-20 flex justify-center items-center">
                     {isFetchingMore && <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-yt-blue"></div>}
