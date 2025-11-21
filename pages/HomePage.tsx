@@ -51,6 +51,9 @@ const HomePage: React.FC = () => {
 
     const seenIdsRef = useRef<Set<string>>(new Set());
     const isAiAugmentedRef = useRef(false);
+    
+    // Ref to track feed length without triggering re-renders/dependency changes
+    const feedLengthRef = useRef(0);
 
     const { subscribedChannels } = useSubscription();
     const { searchHistory } = useSearchHistory();
@@ -58,6 +61,11 @@ const HomePage: React.FC = () => {
     const { preferredGenres, preferredChannels, ngKeywords, ngChannels, exportUserData, importUserData, useXrai } = usePreference();
     const { getAiRecommendations, initializeEngine, isLoaded, isLoading: isAiLoading, discoveryVideoCache } = useAi();
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Update feed length ref whenever feed changes
+    useEffect(() => {
+        feedLengthRef.current = feed.length;
+    }, [feed.length]);
 
     // Automatically initialize AI engine in background for standard recommendations
     useEffect(() => {
@@ -76,15 +84,8 @@ const HomePage: React.FC = () => {
 
     // Logic to inject AI Discovery videos into the standard feed
     const augmentFeedWithAi = useCallback(async () => {
-        if (isAiAugmentedRef.current || aiMode || feed.length === 0) return;
+        if (isAiAugmentedRef.current || aiMode || feedLengthRef.current === 0) return;
         
-        // Double check to prevent multiple injections if state updates overlap
-        const hasAiContent = feed.some(v => v.isAiRecommended);
-        if (hasAiContent) {
-             isAiAugmentedRef.current = true;
-             return;
-        }
-
         isAiAugmentedRef.current = true;
 
         try {
@@ -101,24 +102,17 @@ const HomePage: React.FC = () => {
                     queries = await getAiRecommendations();
                 } else {
                     // Fallback Strategy: Heuristic "Thinking"
-                    // Instead of simple extraction, we derive associations and expanded interests
                     const profile = buildUserProfile({
                         watchHistory,
                         searchHistory: searchHistory.slice(0, 5),
                         subscribedChannels: subscribedChannels.slice(0, 5)
                     });
                     
-                    // Get top 6 interests
                     const interests = inferTopInterests(profile, 6);
                     
                     if (interests.length >= 2) {
-                        // Strategy 1: Association (Cross-pollination)
-                        // Combine two different top interests to find intersection (e.g., "Gaming OR Music")
                         const queryMix = `${interests[0]} OR ${interests[1]}`;
                         queries.push(queryMix);
-
-                        // Strategy 2: Expansion (Discovery)
-                        // Add discovery modifiers to the top interest
                         const topInterest = interests[0];
                         queries.push(`${topInterest} おすすめ related`);
                         queries.push(`${topInterest} new trending`);
@@ -126,58 +120,38 @@ const HomePage: React.FC = () => {
                         queries.push(`${interests[0]} similar related`);
                         queries.push(`${interests[0]} mix`);
                     } else if (watchHistory.length > 0) {
-                        // Deep Fallback: Use title words from recent history
                         const recent = watchHistory[0];
                         queries.push(`${recent.channelName} related`);
                     }
                 }
 
                 if (queries.length > 0) {
-                    // Pick one query randomly to mix in
                     const query = queries[Math.floor(Math.random() * queries.length)];
                     console.log(`[Discovery] Searching for: ${query}`);
                     
-                    // Search using the query (OR search is handled by YouTube API if query contains "OR")
                     const searchRes = await searchVideos(query, '1');
-                    
-                    // Tag videos as AI recommended
                     aiVideos = searchRes.videos.slice(0, 10).map(v => ({...v, isAiRecommended: true}));
-                    
-                    // Shuffle for randomness
                     aiVideos = aiVideos.sort(() => Math.random() - 0.5);
-                    
-                    // Cache results
                     discoveryVideoCache.current = aiVideos;
                 }
             }
 
             if (aiVideos.length > 0) {
-                // To prevent flickering, append AI videos instead of splicing them in.
-                // This satisfies the user request to "stack new videos at the bottom".
                 setFeed(currentFeed => {
-                    // Safety check to prevent multiple appends on re-renders
                     if (currentFeed.some(v => v.isAiRecommended)) return currentFeed;
-
-                    // Get IDs of videos already in the feed for quick lookup
                     const existingIds = new Set(currentFeed.map(v => v.id));
-
-                    // Filter out any AI-recommended videos that are already present
                     const newAiVideos = aiVideos.filter(v => !existingIds.has(v.id));
-
-                    // Add a proportional number of AI videos (approx. 20%) to the end of the feed
                     const videosToAppend = newAiVideos.slice(0, Math.ceil(currentFeed.length / 5));
-
                     if (videosToAppend.length > 0) {
                         return [...currentFeed, ...videosToAppend];
                     }
-                    
                     return currentFeed;
                 });
             }
         } catch (e) {
             console.warn("AI augmentation background task failed", e);
         }
-    }, [getAiRecommendations, aiMode, feed, discoveryVideoCache, isLoaded, watchHistory, searchHistory, subscribedChannels]);
+    }, [getAiRecommendations, aiMode, discoveryVideoCache, isLoaded, watchHistory, searchHistory, subscribedChannels]);
 
     // Trigger AI Augmentation (or Fallback) when feed is ready
     useEffect(() => {
@@ -190,8 +164,8 @@ const HomePage: React.FC = () => {
     const loadRecommendations = useCallback(async (pageNum: number) => {
         if (aiMode) return;
         
-        // Stop loading if we hit the limit
-        if (feed.length >= MAX_FEED_VIDEOS) {
+        // Stop loading if we hit the limit (Using Ref to prevent dependency loop)
+        if (feedLengthRef.current >= MAX_FEED_VIDEOS) {
             setHasNextPage(false);
             setIsFetchingMore(false);
             return;
@@ -215,8 +189,7 @@ const HomePage: React.FC = () => {
                     preferredGenres, preferredChannels, ngKeywords, ngChannels,
                     page: pageNum
                 });
-                // XRAI always attempts to return content, so we assume there's more
-                setHasNextPage(feed.length < MAX_FEED_VIDEOS); 
+                setHasNextPage(feedLengthRef.current < MAX_FEED_VIDEOS); 
             } else {
                 if (pageNum > 1) {
                     setIsFetchingMore(false);
@@ -268,7 +241,7 @@ const HomePage: React.FC = () => {
             setIsLoading(false);
             setIsFetchingMore(false);
         }
-    }, [subscribedChannels, searchHistory, watchHistory, preferredGenres, preferredChannels, ngKeywords, ngChannels, useXrai, aiMode, feed.length]);
+    }, [subscribedChannels, searchHistory, watchHistory, preferredGenres, preferredChannels, ngKeywords, ngChannels, useXrai, aiMode]); // Removed feed.length dependency
 
     useEffect(() => {
         if (!aiMode) {
@@ -278,6 +251,7 @@ const HomePage: React.FC = () => {
             seenIdsRef.current.clear();
             setError(null);
             setHasNextPage(true);
+            feedLengthRef.current = 0;
             
             loadRecommendations(1);
         }
@@ -299,12 +273,11 @@ const HomePage: React.FC = () => {
             const results = await Promise.all(searchPromises);
             const merged = results.flat();
             
-            // Shuffle and dedup
             const unique = Array.from(new Map(merged.map(v => [v.id, v])).values());
             const shuffled = unique.sort(() => Math.random() - 0.5);
             
             setFeed(shuffled);
-            setHasNextPage(false); // AI feed is finite for now
+            setHasNextPage(false);
 
         } catch (e) {
             console.error(e);
@@ -317,7 +290,7 @@ const HomePage: React.FC = () => {
     }
 
     const loadMore = () => {
-        if (!isFetchingMore && !isLoading && hasNextPage && !aiMode && feed.length < MAX_FEED_VIDEOS) {
+        if (!isFetchingMore && !isLoading && hasNextPage && !aiMode && feedLengthRef.current < MAX_FEED_VIDEOS) {
             const nextPage = page + 1;
             setPage(nextPage);
             loadRecommendations(nextPage);
@@ -337,7 +310,6 @@ const HomePage: React.FC = () => {
         }
     };
 
-    // 初期ユーザーかつ読み込み完了後
     if (isNewUser && feed.length === 0 && !isLoading && !aiMode) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 animate-fade-in">
@@ -380,7 +352,6 @@ const HomePage: React.FC = () => {
 
     return (
         <div className="pb-10">
-            {/* Categories / Filter Bar with AI Button */}
              <div className="sticky top-14 bg-yt-white/95 dark:bg-yt-black/95 backdrop-blur-md z-20 pb-2 pt-2 mb-4 -mx-4 px-4 border-b border-yt-spec-light-10 dark:border-yt-spec-10">
                 <div className="flex items-center gap-3 overflow-x-auto no-scrollbar">
                      <button 
@@ -397,7 +368,6 @@ const HomePage: React.FC = () => {
                         {isAiGenerating ? <div className="animate-spin h-3 w-3 border-2 border-white rounded-full border-t-transparent"/> : '✨'}
                         AIキュレーター
                      </button>
-                     {/* Static genre chips based on preferences */}
                      {preferredGenres.map(g => (
                          <button key={g} className="px-3 py-1.5 bg-yt-light dark:bg-yt-spec-10 rounded-lg text-sm font-medium whitespace-nowrap hover:bg-gray-200 dark:hover:bg-yt-spec-20">
                              {g}
@@ -408,7 +378,6 @@ const HomePage: React.FC = () => {
 
             {error && <div className="text-red-500 text-center mb-4">{error}</div>}
             
-            {/* AI Mode Header */}
             {aiMode && !isLoading && feed.length > 0 && (
                  <div className="mb-8 px-4 mt-8 pt-4 bg-yt-light/30 dark:bg-white/5 rounded-xl border border-yt-spec-light-10 dark:border-yt-spec-10 backdrop-blur-sm">
                     <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-blue-500">
