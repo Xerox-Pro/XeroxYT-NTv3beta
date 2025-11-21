@@ -6,7 +6,7 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { useSearchHistory } from '../contexts/SearchHistoryContext';
 import { useHistory } from '../contexts/HistoryContext';
 import { usePreference } from '../contexts/PreferenceContext';
-import { getDeeplyAnalyzedRecommendations } from '../utils/recommendation';
+import { getXraiRecommendations, getLegacyRecommendations } from '../utils/recommendation';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
 import type { Video } from '../types';
 import { SearchIcon, SaveIcon, DownloadIcon } from '../components/icons/Icons';
@@ -32,7 +32,6 @@ const parseDuration = (iso: string, text: string): number => {
 }
 
 const HomePage: React.FC = () => {
-    // 単一のビデオフィードとして管理
     const [feed, setFeed] = useState<Video[]>([]);
     const [shortsFeed, setShortsFeed] = useState<Video[]>([]);
     
@@ -40,23 +39,21 @@ const HomePage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [page, setPage] = useState(1);
     const [isFetchingMore, setIsFetchingMore] = useState(false);
+    const [hasNextPage, setHasNextPage] = useState(true);
 
-    // 重複排除用：これまでに表示した全動画IDを保持するRef
     const seenIdsRef = useRef<Set<string>>(new Set());
 
     const { subscribedChannels } = useSubscription();
     const { searchHistory } = useSearchHistory();
     const { history: watchHistory } = useHistory();
-    const { preferredGenres, preferredChannels, ngKeywords, ngChannels, exportUserData, importUserData } = usePreference();
+    const { preferredGenres, preferredChannels, ngKeywords, ngChannels, exportUserData, importUserData, useXrai } = usePreference();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // ユーザーが「新規（データなし）」かどうかを判定
     const isNewUser = useMemo(() => {
-        const hasSubscriptions = subscribedChannels.length > 1; // Default subscription counts as 1
+        const hasSubscriptions = subscribedChannels.length > 1;
         const hasSearchHistory = searchHistory.length > 0;
         const hasWatchHistory = watchHistory.length > 0;
         const hasPreferences = preferredGenres.length > 0;
-
         return !(hasSubscriptions || hasSearchHistory || hasWatchHistory || hasPreferences);
     }, [subscribedChannels, searchHistory, watchHistory, preferredGenres]);
 
@@ -69,19 +66,27 @@ const HomePage: React.FC = () => {
         }
         
         try {
-            // おすすめ動画を取得
-            const rawVideos = await getDeeplyAnalyzedRecommendations({
-                searchHistory,
-                watchHistory,
-                subscribedChannels,
-                preferredGenres,
-                preferredChannels,
-                ngKeywords,
-                ngChannels,
-                page: pageNum
-            });
+            let rawVideos: Video[];
 
-            // クライアントサイドでの重複チェックと振り分け
+            if (useXrai) {
+                // Use the advanced XRAI v2 engine
+                rawVideos = await getXraiRecommendations({
+                    searchHistory, watchHistory, subscribedChannels,
+                    preferredGenres, preferredChannels, ngKeywords, ngChannels,
+                    page: pageNum
+                });
+                setHasNextPage(rawVideos.length > 0); // XRAI can potentially generate infinitely
+            } else {
+                // Use the legacy engine (one-shot, no pagination)
+                if (pageNum > 1) {
+                    setIsFetchingMore(false);
+                    setHasNextPage(false);
+                    return;
+                }
+                rawVideos = await getLegacyRecommendations();
+                setHasNextPage(false);
+            }
+
             const newVideos: Video[] = [];
             const newShorts: Video[] = [];
 
@@ -90,7 +95,6 @@ const HomePage: React.FC = () => {
                 seenIdsRef.current.add(v.id);
 
                 const seconds = parseDuration(v.isoDuration, v.duration);
-                // ショート動画判定: 60秒以下 または タイトルに#shorts
                 const isShort = (seconds > 0 && seconds <= 60) || v.title.toLowerCase().includes('#shorts');
 
                 if (isShort) {
@@ -117,33 +121,28 @@ const HomePage: React.FC = () => {
             setIsLoading(false);
             setIsFetchingMore(false);
         }
-    }, [subscribedChannels, searchHistory, watchHistory, preferredGenres, preferredChannels, ngKeywords, ngChannels]);
+    }, [subscribedChannels, searchHistory, watchHistory, preferredGenres, preferredChannels, ngKeywords, ngChannels, useXrai]);
 
-    // 初期ロード
     useEffect(() => {
         setPage(1);
         setFeed([]);
         setShortsFeed([]);
         seenIdsRef.current.clear();
         setError(null);
+        setHasNextPage(true);
         
-        if (isNewUser) {
-            // 新規ユーザーでも、急上昇などを出すためにロードは試みる
-            loadRecommendations(1); 
-        } else {
-            loadRecommendations(1);
-        }
-    }, [loadRecommendations, isNewUser]);
+        loadRecommendations(1);
+    }, [loadRecommendations]);
 
     const loadMore = () => {
-        if (!isFetchingMore && !isLoading) {
+        if (!isFetchingMore && !isLoading && hasNextPage) {
             const nextPage = page + 1;
             setPage(nextPage);
             loadRecommendations(nextPage);
         }
     };
 
-    const lastElementRef = useInfiniteScroll(loadMore, true, isFetchingMore || isLoading);
+    const lastElementRef = useInfiniteScroll(loadMore, hasNextPage, isFetchingMore || isLoading);
 
     const handleImportClick = () => {
         fileInputRef.current?.click();
@@ -156,7 +155,6 @@ const HomePage: React.FC = () => {
         }
     };
 
-    // 新規ユーザーでコンテンツが全くない場合のガイド
     if (isNewUser && feed.length === 0 && !isLoading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 animate-fade-in">
@@ -170,7 +168,6 @@ const HomePage: React.FC = () => {
                     <br />
                     上の検索バーから、好きなキーワードで検索してみてください！
                 </p>
-
                 <div className="flex gap-4">
                     <button 
                         onClick={exportUserData}
@@ -202,7 +199,6 @@ const HomePage: React.FC = () => {
         <div className="pb-10">
             {error && <div className="text-red-500 text-center mb-4">{error}</div>}
             
-            {/* ショート動画の棚 (最上部に配置、またはフィードの途中に差し込むことも可能だが、まずはシンプルに上部へ) */}
             {shortsFeed.length > 0 && (
                 <div className="mb-8">
                     <ShortsShelf shorts={shortsFeed} isLoading={false} />
@@ -210,10 +206,8 @@ const HomePage: React.FC = () => {
                 </div>
             )}
 
-            {/* メイン動画グリッド */}
             <VideoGrid videos={feed} isLoading={false} />
 
-            {/* ローディングスケルトン */}
             {(isLoading || isFetchingMore) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-8 mt-8">
                     {Array.from({ length: 10 }).map((_, index) => (
@@ -231,8 +225,7 @@ const HomePage: React.FC = () => {
                 </div>
             )}
 
-            {/* 無限スクロールのセンチネル */}
-            {!isLoading && (
+            {!isLoading && hasNextPage && feed.length > 0 && (
                 <div ref={lastElementRef} className="h-20 flex justify-center items-center" />
             )}
         </div>

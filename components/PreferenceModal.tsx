@@ -13,10 +13,12 @@ const PreferenceModal: React.FC<PreferenceModalProps> = ({ isOpen, onClose }) =>
         preferredGenres, 
         preferredDurations, preferredFreshness, discoveryMode, ngKeywords, ngChannels,
         prefDepth, prefVocal, prefInfoEnt, prefVisual, prefCommunity,
+        useXrai,
         addPreferredGenre, removePreferredGenre, 
         togglePreferredDuration, setPreferredFreshness, setDiscoveryMode,
         addNgKeyword, removeNgKeyword, removeNgChannel,
-        setPrefDepth, setPrefVocal, setPrefInfoEnt, setPrefVisual, setPrefCommunity
+        setPrefDepth, setPrefVocal, setPrefInfoEnt, setPrefVisual, setPrefCommunity,
+        setUseXrai
     } = usePreference();
 
     const [genreInput, setGenreInput] = useState('');
@@ -94,6 +96,28 @@ const PreferenceModal: React.FC<PreferenceModalProps> = ({ isOpen, onClose }) =>
                 </div>
 
                 <div className="overflow-y-auto p-6 space-y-10 flex-1">
+                    {/* Section 0: Engine Selection */}
+                    <section>
+                        <h3 className="text-lg font-bold text-black dark:text-white mb-4 flex items-center gap-2">
+                           推薦エンジン設定
+                        </h3>
+                         <div className="bg-yt-light dark:bg-yt-spec-10 p-4 rounded-xl flex items-center justify-between">
+                            <div>
+                                <h4 className="font-bold text-black dark:text-white">XRAIエンジンを有効にする</h4>
+                                <p className="text-xs text-yt-light-gray mt-1">あなた専用に最適化された、より高度なAI推薦を利用します。</p>
+                            </div>
+                            <label className="relative inline-block w-12 h-6 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={useXrai}
+                                    onChange={() => setUseXrai(!useXrai)}
+                                    className="sr-only"
+                                />
+                                <div className={`block h-6 rounded-full transition-colors ${useXrai ? 'bg-yt-blue' : 'bg-yt-gray'}`}></div>
+                                <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${useXrai ? 'transform translate-x-6' : ''}`}></div>
+                            </label>
+                         </div>
+                    </section>
                     
                     {/* Section 1: Vibe Check */}
                     <section>

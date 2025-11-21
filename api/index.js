@@ -1,3 +1,4 @@
+
 import express from "express";
 import { Innertube } from "youtubei.js";
 
@@ -367,16 +368,27 @@ app.get('/api/playlist', async (req, res) => {
 });
 
 // -------------------------------------------------------------------
-// 急上昇 API (/api/fvideo)
+// ホームフィード（旧急上昇） API (/api/fvideo)
 // -------------------------------------------------------------------
 app.get('/api/fvideo', async (req, res) => {
   try {
     const youtube = await createYoutube();
-    // 一般的な急上昇を取得 (Music指定を解除)
-    const trending = await youtube.getTrending();
-    // 構造の揺れに対応
-    const videos = trending.videos || trending.items || trending.contents || [];
-    res.status(200).json({ videos });
+    const home = await youtube.getHomeFeed();
+    let allVideos = home.videos ? [...home.videos] : [];
+    
+    // 1回だけ続きを取得して、より多くの動画を返す
+    if (home.has_continuation) {
+        try {
+            const continuation = await home.getContinuation();
+            if (continuation.videos) {
+                allVideos.push(...continuation.videos);
+            }
+        } catch (e) {
+            console.warn('[API] Home feed continuation failed:', e.message);
+        }
+    }
+    
+    res.status(200).json({ videos: allVideos });
   } catch (err) { 
       console.error('Error in /api/fvideo:', err); 
       res.status(500).json({ error: err.message }); 

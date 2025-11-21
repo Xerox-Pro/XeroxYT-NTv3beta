@@ -21,6 +21,8 @@ interface PreferenceContextType {
   prefVisual: string;     // 'real' | 'avatar' | 'any'
   prefCommunity: string;  // 'solo' | 'collab' | 'any'
 
+  useXrai: boolean; // XRAI engine toggle
+
   addPreferredGenre: (genre: string) => void;
   removePreferredGenre: (genre: string) => void;
   addPreferredChannel: (channel: string) => void;
@@ -47,6 +49,7 @@ interface PreferenceContextType {
   setPrefPacing: (val: string) => void;
   setPrefVisual: (val: string) => void;
   setPrefCommunity: (val: string) => void;
+  setUseXrai: (use: boolean) => void;
 
   exportUserData: () => void;
   importUserData: (file: File) => Promise<void>;
@@ -84,6 +87,8 @@ export const PreferenceProvider: React.FC<{ children: ReactNode }> = ({ children
   const [prefPacing, setPrefPacing] = useState(() => window.localStorage.getItem('prefPacing') || 'any');
   const [prefVisual, setPrefVisual] = useState(() => window.localStorage.getItem('prefVisual') || 'any');
   const [prefCommunity, setPrefCommunity] = useState(() => window.localStorage.getItem('prefCommunity') || 'any');
+  const [useXrai, setUseXrai] = useState<boolean>(() => window.localStorage.getItem('useXrai') !== 'false');
+
 
   // Persistence
   useEffect(() => { localStorage.setItem('preferredGenres', JSON.stringify(preferredGenres)); }, [preferredGenres]);
@@ -103,6 +108,7 @@ export const PreferenceProvider: React.FC<{ children: ReactNode }> = ({ children
   useEffect(() => { localStorage.setItem('prefPacing', prefPacing); }, [prefPacing]);
   useEffect(() => { localStorage.setItem('prefVisual', prefVisual); }, [prefVisual]);
   useEffect(() => { localStorage.setItem('prefCommunity', prefCommunity); }, [prefCommunity]);
+  useEffect(() => { localStorage.setItem('useXrai', String(useXrai)); }, [useXrai]);
 
   // Handlers
   const addPreferredGenre = (genre: string) => !preferredGenres.includes(genre) && setPreferredGenres(p => [...p, genre]);
@@ -120,7 +126,7 @@ export const PreferenceProvider: React.FC<{ children: ReactNode }> = ({ children
   const exportUserData = () => {
     const data = {
       timestamp: new Date().toISOString(),
-      version: '1.2',
+      version: '1.3',
       subscriptions: JSON.parse(localStorage.getItem('subscribedChannels') || '[]'),
       history: JSON.parse(localStorage.getItem('videoHistory') || '[]'),
       playlists: JSON.parse(localStorage.getItem('playlists') || '[]'),
@@ -134,7 +140,8 @@ export const PreferenceProvider: React.FC<{ children: ReactNode }> = ({ children
         ngChannels: ngChannels,
         // New preferences
         prefDepth, prefVocal, prefEra, prefRegion,
-        prefLive, prefInfoEnt, prefPacing, prefVisual, prefCommunity
+        prefLive, prefInfoEnt, prefPacing, prefVisual, prefCommunity,
+        useXrai,
       }
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -180,6 +187,7 @@ export const PreferenceProvider: React.FC<{ children: ReactNode }> = ({ children
             if (p.prefPacing) localStorage.setItem('prefPacing', p.prefPacing);
             if (p.prefVisual) localStorage.setItem('prefVisual', p.prefVisual);
             if (p.prefCommunity) localStorage.setItem('prefCommunity', p.prefCommunity);
+            if (typeof p.useXrai === 'boolean') localStorage.setItem('useXrai', String(p.useXrai));
           }
 
           // Refresh to load new data into contexts
@@ -199,9 +207,11 @@ export const PreferenceProvider: React.FC<{ children: ReactNode }> = ({ children
     <PreferenceContext.Provider value={{
       preferredGenres, preferredChannels, preferredDurations, preferredFreshness, discoveryMode, ngKeywords, ngChannels,
       prefDepth, prefVocal, prefEra, prefRegion, prefLive, prefInfoEnt, prefPacing, prefVisual, prefCommunity,
+      useXrai,
       addPreferredGenre, removePreferredGenre, addPreferredChannel, removePreferredChannel, togglePreferredDuration, setPreferredFreshness, setDiscoveryMode, 
       addNgKeyword, removeNgKeyword, addNgChannel, removeNgChannel, isNgChannel,
       setPrefDepth, setPrefVocal, setPrefEra, setPrefRegion, setPrefLive, setPrefInfoEnt, setPrefPacing, setPrefVisual, setPrefCommunity,
+      setUseXrai,
       exportUserData, importUserData
     }}>
       {children}
