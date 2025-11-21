@@ -15,6 +15,7 @@ interface AiContextType {
   loadProgress: string;
   initializeEngine: () => Promise<void>;
   getAiRecommendations: () => Promise<string[]>;
+  summarizeComments: (comments: string[]) => Promise<string>;
   discoveryVideoCache: React.MutableRefObject<Video[]>;
 }
 
@@ -116,14 +117,52 @@ export const AiProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     }
   }, [history, subscribedChannels, initializeEngine]);
 
+  // Summarize comments using Local LLM
+  const summarizeComments = useCallback(async (comments: string[]): Promise<string> => {
+    if (!engine.current) {
+        await initializeEngine();
+    }
+    if (!engine.current) return "エンジンの読み込みに失敗しました。";
+
+    // Limit input to avoid context overflow (top 30 comments usually capture the vibe)
+    const commentsText = comments.slice(0, 30).join('\n');
+
+    const prompt = `
+    あなたはYouTube動画のコメント分析AIです。
+    以下の視聴者コメントを読み、動画に対する主な反応や意見、議論の論点を日本語で要約してください。
+    
+    出力形式:
+    - 箇条書きで3〜5点
+    - 簡潔な日本語で
+    - 感情的な傾向（ポジティブ/ネガティブ/議論中など）も含める
+
+    コメントリスト:
+    ${commentsText}
+    `;
+
+    try {
+        const reply = await engine.current.chat.completions.create({
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.6, 
+            max_tokens: 300,
+        });
+        
+        return reply.choices[0].message.content || '要約を生成できませんでした。';
+    } catch (e) {
+        console.error("Comment summarization failed", e);
+        return "エラーが発生しました。もう一度お試しください。";
+    }
+  }, [initializeEngine]);
+
   const value = useMemo(() => ({
     isLoaded, 
     isLoading, 
     loadProgress, 
     initializeEngine, 
     getAiRecommendations,
+    summarizeComments,
     discoveryVideoCache
-  }), [isLoaded, isLoading, loadProgress, initializeEngine, getAiRecommendations]);
+  }), [isLoaded, isLoading, loadProgress, initializeEngine, getAiRecommendations, summarizeComments]);
 
   return (
     <AiContext.Provider value={value}>

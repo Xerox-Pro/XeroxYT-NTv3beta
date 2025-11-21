@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 import { getVideoDetails, getPlayerConfig, getComments, getVideosByIds, getExternalRelatedVideos } from '../utils/api';
@@ -5,6 +6,7 @@ import type { VideoDetails, Video, Comment, Channel } from '../types';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useHistory } from '../contexts/HistoryContext';
 import { usePlaylist } from '../contexts/PlaylistContext';
+import { useAi } from '../contexts/AiContext'; // Import useAi
 import VideoPlayerPageSkeleton from '../components/skeletons/VideoPlayerPageSkeleton';
 import PlaylistModal from '../components/PlaylistModal';
 import CommentComponent from '../components/Comment';
@@ -31,12 +33,17 @@ const VideoPlayerPage: React.FC = () => {
     const [isCollaboratorMenuOpen, setIsCollaboratorMenuOpen] = useState(false);
     const collaboratorMenuRef = useRef<HTMLDivElement>(null);
     
+    // AI Summary States
+    const [summary, setSummary] = useState<string | null>(null);
+    const [isSummarizing, setIsSummarizing] = useState(false);
+    
     const [isShuffle, setIsShuffle] = useState(searchParams.get('shuffle') === '1');
     const [isLoop, setIsLoop] = useState(searchParams.get('loop') === '1');
 
     const { isSubscribed, subscribe, unsubscribe } = useSubscription();
     const { addVideoToHistory } = useHistory();
     const { playlists, reorderVideosInPlaylist } = usePlaylist();
+    const { summarizeComments, isLoaded: isAiLoaded, initializeEngine, loadProgress } = useAi(); // Use AI Context
 
     const currentPlaylist = useMemo(() => {
         if (!playlistId) return null;
@@ -97,6 +104,7 @@ const VideoPlayerPage: React.FC = () => {
                 setVideoDetails(null);
                 setComments([]);
                 setRelatedVideos([]);
+                setSummary(null); // Reset summary on new video
                 window.scrollTo(0, 0);
             }
 
@@ -194,6 +202,28 @@ const VideoPlayerPage: React.FC = () => {
     const handlePlaylistReorder = (startIndex: number, endIndex: number) => {
         if (!playlistId) return;
         reorderVideosInPlaylist(playlistId, startIndex, endIndex);
+    };
+
+    const handleSummarizeComments = async () => {
+        if (comments.length === 0) return;
+        setIsSummarizing(true);
+        
+        try {
+             // Extract text only
+            const commentTexts = comments.map(c => c.text).filter(t => t && t.length > 0);
+            if (commentTexts.length === 0) {
+                setSummary("有効なコメントがありません。");
+                setIsSummarizing(false);
+                return;
+            }
+
+            const result = await summarizeComments(commentTexts);
+            setSummary(result);
+        } catch (e) {
+            setSummary("要約中にエラーが発生しました。");
+        } finally {
+            setIsSummarizing(false);
+        }
     };
 
     if (isLoading || playerParams === null) {
@@ -382,9 +412,46 @@ const VideoPlayerPage: React.FC = () => {
 
                     {/* Comments Section */}
                     <div className="mt-6 hidden lg:block">
-                        <div className="flex items-center mb-6">
-                            <h2 className="text-xl font-bold">{comments.length.toLocaleString()}件のコメント</h2>
+                        <div className="flex flex-col mb-6">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-xl font-bold">{comments.length.toLocaleString()}件のコメント</h2>
+                                <button 
+                                    onClick={handleSummarizeComments}
+                                    disabled={isSummarizing}
+                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+                                >
+                                    {isSummarizing ? (
+                                        <>
+                                            <div className="animate-spin h-3 w-3 border-2 border-white rounded-full border-t-transparent"/>
+                                            生成中...
+                                        </>
+                                    ) : (
+                                        <>✨ AI要約</>
+                                    )}
+                                </button>
+                            </div>
+                            
+                            {/* Load Progress (if initializing) */}
+                            {!isAiLoaded && isSummarizing && (
+                                <p className="text-xs text-yt-light-gray mt-2 text-right">{loadProgress}</p>
+                            )}
                         </div>
+
+                        {/* Summary Display */}
+                        {summary && (
+                            <div className="mb-6 p-4 bg-yt-light dark:bg-[#272727] rounded-xl border border-purple-500/30">
+                                <h3 className="text-sm font-bold text-purple-500 mb-2 flex items-center gap-2">
+                                    ✨ コメントAI要約
+                                </h3>
+                                <div className="text-sm whitespace-pre-wrap leading-relaxed text-black dark:text-white">
+                                    {summary}
+                                </div>
+                                <p className="text-xs text-yt-light-gray mt-2 text-right">
+                                    Local LLM (Phi-3) による生成
+                                </p>
+                            </div>
+                        )}
+
                         {comments.length > 0 ? (
                             <div className="space-y-4">
                                 {comments.map(comment => (
@@ -425,6 +492,23 @@ const VideoPlayerPage: React.FC = () => {
                 {/* Mobile Comments Fallback */}
                 <div className="block lg:hidden mt-8 border-t border-yt-spec-light-20 dark:border-yt-spec-20 pt-4">
                     <h2 className="text-lg font-bold mb-4">{comments.length.toLocaleString()}件のコメント</h2>
+                     <button 
+                        onClick={handleSummarizeComments}
+                        disabled={isSummarizing}
+                        className="w-full mb-4 flex justify-center items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+                    >
+                         {isSummarizing ? '生成中...' : '✨ AI要約'}
+                    </button>
+                    
+                     {summary && (
+                        <div className="mb-6 p-4 bg-yt-light dark:bg-[#272727] rounded-xl border border-purple-500/30">
+                             <h3 className="text-sm font-bold text-purple-500 mb-2">✨ コメントAI要約</h3>
+                            <div className="text-sm whitespace-pre-wrap leading-relaxed">
+                                {summary}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="space-y-4">
                         {comments.map(comment => (
                             <CommentComponent key={comment.comment_id} comment={comment} />
