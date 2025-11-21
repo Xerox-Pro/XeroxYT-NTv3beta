@@ -3,7 +3,8 @@
   "builds": [
     {
       "src": "api/stream.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": { "includeFiles": ["yt-dlp_linux"] }
     },
     {
       "src": "api/index.js",

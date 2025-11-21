@@ -9,15 +9,15 @@
     "preview": "vite preview",
     "postinstall": "curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o ./yt-dlp_linux && chmod +x ./yt-dlp_linux"
   },
-"dependencies": {
-  "dayjs": "^1.11.11", 
-  "express": "^5.1.0",
-  "react": "^19.1.1",
-  "react-dom": "^19.1.1",
-  "react-router-dom": "^6.25.1",
-  "uuid": "^13.0.0",
-  "youtubei.js": "^9.0.0"
-},
+  "dependencies": {
+    "dayjs": "^1.11.11",
+    "express": "^5.1.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-router-dom": "^6.25.1",
+    "uuid": "^13.0.0",
+    "youtubei.js": "^9.0.0"
+  },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vercel/node": "^3.2.0",

@@ -12,7 +12,7 @@ import CommentComponent from '../components/Comment';
 import PlaylistPanel from '../components/PlaylistPanel';
 import RelatedVideoCard from '../components/RelatedVideoCard';
 import StreamingPlayer from '../components/StreamingPlayer';
-import { LikeIcon, SaveIcon, MoreIconHorizontal, ShareIcon, DownloadIcon, ThanksIcon, DislikeIcon, ChevronRightIcon, CheckIcon, PlayIcon, CloseIcon } from '../components/icons/Icons';
+import { LikeIcon, SaveIcon, MoreIconHorizontal, ShareIcon, DownloadIcon, DislikeIcon, ChevronRightIcon, CloseIcon } from '../components/icons/Icons';
 
 type PlayerMode = 'embed' | 'stream';
 
@@ -119,7 +119,6 @@ const VideoPlayerPage: React.FC = () => {
                             setRelatedVideos(details.relatedVideos);
                         }
                         addVideoToHistory(details);
-                        // Stop loading here so the player shows up immediately
                         setIsLoading(false);
                     }
                 })
@@ -167,13 +166,18 @@ const VideoPlayerPage: React.FC = () => {
         
         setIsStreamLoading(true);
         try {
+            console.log("Fetching stream data for:", videoId);
             const res = await fetch(`/api/stream?videoId=${videoId}`);
-            if (!res.ok) throw new Error('ストリーム情報の取得に失敗しました');
+            if (!res.ok) {
+                const errText = await res.text();
+                console.error("Stream API Error Response:", errText);
+                throw new Error(`API Error: ${res.status}`);
+            }
             const data = await res.json();
             setStreamData(data);
         } catch (err) {
-            console.error(err);
-            alert('ストリーミングリンクの取得に失敗しました。埋め込みプレーヤーを使用してください。');
+            console.error("Failed to fetch stream data:", err);
+            alert('ストリーミングリンクの取得に失敗しました。コンソールログを確認してください。');
             setPlayerMode('embed');
         } finally {
             setIsStreamLoading(false);
@@ -303,8 +307,9 @@ const VideoPlayerPage: React.FC = () => {
                         ) : streamData?.streamingUrl ? (
                             <StreamingPlayer videoUrl={streamData.streamingUrl} />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center text-white">
+                            <div className="w-full h-full flex items-center justify-center text-white flex-col gap-2">
                                 <p>ストリーミングリンクが見つかりませんでした。</p>
+                                <button onClick={() => setPlayerMode('embed')} className="text-yt-blue underline">埋め込みプレーヤーに戻る</button>
                             </div>
                         )
                     )}
