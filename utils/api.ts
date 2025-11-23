@@ -213,33 +213,46 @@ export async function searchVideos(query: string, pageToken = '1', channelId?: s
     return { videos: filteredVideos, shorts, channels, playlists, nextPageToken: data.nextPageToken };
 }
 
+// 指定されたAPIから関連動画を取得する関数
 export async function getExternalRelatedVideos(videoId: string): Promise<Video[]> {
     try {
         const response = await fetch(`https://siawaseok.duckdns.org/api/video2/${videoId}`);
-        if (!response.ok) return [];
         
-        // Check if the response is actually JSON before parsing
+        // JSONでない場合やエラーの場合は空配列を返す
         const contentType = response.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-             // If it's not JSON (e.g. 404 page HTML), return empty safely
+        if (!response.ok || !contentType || !contentType.includes("application/json")) {
              return [];
         }
 
         const data = await response.json();
         
-        // Handle various response structures (array, object with items, object with related_videos)
+        // 配列またはオブジェクト（items/related_videosプロパティ）に対応
         const items = Array.isArray(data) ? data : (data.items || data.related_videos || []);
         
+        if (!Array.isArray(items)) return [];
+
         return items.map((item: any) => {
-            // If item is already in our internal Video format (likely from a previous proxy transformation)
-            if (item.id && item.thumbnailUrl && item.channelName) {
-                return item as Video;
+            // 既に整形済みのVideoオブジェクトの場合
+            if (item.id && (item.thumbnailUrl || item.thumbnail) && (item.channelName || item.author)) {
+                return {
+                    id: item.id,
+                    title: item.title,
+                    thumbnailUrl: item.thumbnailUrl || item.thumbnail,
+                    duration: item.duration || '',
+                    isoDuration: item.isoDuration || '',
+                    channelName: item.channelName || item.author,
+                    channelId: item.channelId || item.authorId || '',
+                    channelAvatarUrl: item.channelAvatarUrl || item.channelIcon || '',
+                    views: item.views || '',
+                    uploadedAt: item.uploadedAt || item.published || '',
+                    descriptionSnippet: item.descriptionSnippet || item.description || ''
+                } as Video;
             }
-            // Otherwise map from YoutubeI/raw format
+            // YoutubeI形式の場合
             return mapYoutubeiVideoToVideo(item);
         }).filter((v: any): v is Video => v !== null);
     } catch (e) {
-        console.warn("Failed to fetch external related videos silently:", e);
+        console.warn("Failed to fetch external related videos:", e);
         return [];
     }
 }
@@ -261,7 +274,6 @@ export async function getVideoDetails(videoId: string): Promise<VideoDetails> {
     let channelAvatar = secondary?.owner?.author?.thumbnails?.[0]?.url ?? '';
     const subscriberCount = secondary?.owner?.subscriber_count?.text ?? '非公開';
 
-    // メインの著者名が "N/A" または 不明な場合、コラボレーターリストを探す
     if (channelName === 'N/A' || !channelName) {
         try {
             const listItems = secondary?.owner?.author?.endpoint?.payload?.panelLoadingStrategy?.inlineContent?.dialogViewModel?.customContent?.listViewModel?.listItems;
@@ -274,7 +286,6 @@ export async function getVideoDetails(videoId: string): Promise<VideoDetails> {
                     const title = vm.title?.content || '';
                     const avatar = vm.leadingAccessory?.avatarViewModel?.image?.sources?.[0]?.url || '';
                     
-                    // channelIdの抽出 (endpoint内または直接)
                     let cId = '';
                     const browseEndpoint = vm.rendererContext?.commandContext?.onTap?.innertubeCommand?.browseEndpoint || 
                                            vm.title?.commandRuns?.[0]?.onTap?.innertubeCommand?.browseEndpoint ||
@@ -284,7 +295,6 @@ export async function getVideoDetails(videoId: string): Promise<VideoDetails> {
                         cId = browseEndpoint.browseId;
                     }
 
-                    // サブタイトルから登録者数を抽出 (例: "@Nanatsukaze_ • チャンネル登録者数 4.4万人")
                     const subText = vm.subtitle?.content || '';
                     const subCountMatch = subText.match(/チャンネル登録者数\s+(.+)$/);
                     const subCount = subCountMatch ? subCountMatch[1] : '';
@@ -297,7 +307,6 @@ export async function getVideoDetails(videoId: string): Promise<VideoDetails> {
                     } as Channel;
                 }).filter((c: any): c is Channel => c !== null && c.id !== '');
 
-                // コラボレーターが見つかった場合、最初の1人をメインチャンネルとして扱う
                 if (collaborators.length > 0) {
                     channelId = collaborators[0].id;
                     channelName = collaborators[0].name;
@@ -373,7 +382,6 @@ export async function getChannelDetails(channelId: string): Promise<ChannelDetai
     const channel = data.channel;
     if (!channel) throw new Error(`Channel with ID ${channelId} not found.`);
 
-    // FIX: Handle avatarURL correctly whether it is a string (from API normalization) or object/array
     let avatarUrl = '';
     if (typeof channel.avatar === 'string') {
         avatarUrl = channel.avatar;
@@ -433,7 +441,6 @@ export async function getChannelShorts(channelId: string): Promise<{ videos: Vid
 
 export async function getChannelPlaylists(channelId: string): Promise<{ playlists: ApiPlaylist[] }> {
     const data = await apiFetch(`channel-playlists?id=${channelId}`);
-    // Use mapYoutubeiPlaylistToPlaylist for correct data mapping of raw API response
     const playlists: ApiPlaylist[] = (data.playlists || [])
         .map(mapYoutubeiPlaylistToPlaylist)
         .filter((p): p is ApiPlaylist => p !== null);
