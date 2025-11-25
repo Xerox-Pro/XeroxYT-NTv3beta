@@ -137,9 +137,6 @@ const ChannelPage: React.FC = () => {
     const subscribed = isSubscribed(channelDetails.id);
     const blocked = isNgChannel(channelDetails.id);
 
-    // Create uploads playlist ID (Replace 'UC' with 'UU')
-    const uploadsPlaylistId = channelDetails.id.replace(/^UC/, 'UU');
-
     const handleSubscriptionToggle = () => {
         if (!channelDetails.avatarUrl) return;
         const channel: Channel = {
@@ -292,22 +289,6 @@ const ChannelPage: React.FC = () => {
                         {channelDetails.description}
                     </p>
                     <div className="flex items-center justify-center md:justify-start gap-3">
-                         {/* 
-                            FIX: "Play All" button logic.
-                            We construct a playlist ID by replacing 'UC' with 'UU' from the channel ID.
-                            This usually corresponds to the "Uploads" playlist for a channel.
-                            We assume the first video in the list is unknown, so we link to the playlist page or
-                            try to play the first available video if we had it (which we don't here easily without fetching).
-                            Linking to playlist page is safer, or use /watch?list=UU... which youtube supports to start playing.
-                         */}
-                        <Link 
-                            to={`/playlist/${uploadsPlaylistId}`}
-                            className="px-4 md:px-6 py-2 rounded-full text-sm font-medium bg-black dark:bg-white text-white dark:text-black hover:opacity-90 transition-colors flex items-center gap-2"
-                        >
-                            <PlayIcon className="w-4 h-4 fill-current" />
-                            すべて再生
-                        </Link>
-
                         <button 
                             onClick={handleSubscriptionToggle} 
                             className={`px-4 md:px-6 py-2 rounded-full text-sm font-medium transition-colors ${

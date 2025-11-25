@@ -4,6 +4,8 @@ import React, { createContext, useState, useEffect, useContext, ReactNode, useCa
 interface SearchHistoryContextType {
   searchHistory: string[];
   addSearchTerm: (term: string) => void;
+  removeSearchTerms: (terms: string[]) => void;
+  clearSearchHistory: () => void;
 }
 
 const SearchHistoryContext = createContext<SearchHistoryContextType | undefined>(undefined);
@@ -37,8 +39,16 @@ export const SearchHistoryProvider: React.FC<{ children: ReactNode }> = ({ child
     });
   }, []);
 
+  const removeSearchTerms = useCallback((terms: string[]) => {
+    setSearchHistory(prev => prev.filter(t => !terms.includes(t)));
+  }, []);
+
+  const clearSearchHistory = useCallback(() => {
+    setSearchHistory([]);
+  }, []);
+
   return (
-    <SearchHistoryContext.Provider value={{ searchHistory, addSearchTerm }}>
+    <SearchHistoryContext.Provider value={{ searchHistory, addSearchTerm, removeSearchTerms, clearSearchHistory }}>
       {children}
     </SearchHistoryContext.Provider>
   );
