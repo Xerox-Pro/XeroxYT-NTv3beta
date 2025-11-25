@@ -5,8 +5,6 @@ import type { Video } from '../types';
 interface HistoryContextType {
   history: Video[];
   addVideoToHistory: (video: Video) => void;
-  clearHistory: () => void;
-  removeVideosFromHistory: (videoIds: string[]) => void;
 }
 
 const HistoryContext = createContext<HistoryContextType | undefined>(undefined);
@@ -42,16 +40,8 @@ export const HistoryProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   }, []);
 
-  const clearHistory = useCallback(() => {
-    setHistory([]);
-  }, []);
-
-  const removeVideosFromHistory = useCallback((videoIds: string[]) => {
-    setHistory(prev => prev.filter(video => !videoIds.includes(video.id)));
-  }, []);
-
   return (
-    <HistoryContext.Provider value={{ history, addVideoToHistory, clearHistory, removeVideosFromHistory }}>
+    <HistoryContext.Provider value={{ history, addVideoToHistory }}>
       {children}
     </HistoryContext.Provider>
   );
