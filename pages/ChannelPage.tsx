@@ -248,9 +248,6 @@ const ChannelPage: React.FC = () => {
                     <div key={`${playlist.playlistId}-${index}`}>
                         <div className="flex items-center justify-between mb-2 md:mb-4">
                             <h3 className="text-base md:text-lg font-bold">{playlist.title}</h3>
-                            <Link to={`/playlist/${playlist.playlistId}`} className="px-3 py-1 text-xs md:text-sm font-semibold text-yt-blue hover:bg-yt-blue/10 rounded-full">
-                                すべて再生
-                            </Link>
                         </div>
                         <HorizontalScrollContainer>
                             {playlist.items.map(video => (
