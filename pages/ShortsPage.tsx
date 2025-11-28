@@ -15,14 +15,14 @@ import { useTheme } from '../hooks/useTheme';
 
 // Re-created Chevron Icons for better visibility
 const ChevronUpIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" className="fill-current text-black dark:text-white w-8 h-8">
+    <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" className="fill-current text-white w-8 h-8">
         <path d="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z"/>
     </svg>
 );
 
 const ChevronDownIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" className="fill-current text-black dark:text-white w-8 h-8">
-        <path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/>
+    <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" className="fill-current text-white w-8 h-8">
+        <path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6 6z"/>
     </svg>
 );
 
@@ -51,13 +51,19 @@ const ShortsPage: React.FC = () => {
     const wheelTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const iframeRefs = useRef<Map<string, HTMLIFrameElement>>(new Map());
     
-    // Keep track of ALL fetched IDs to prevent duplicates strictly
     const seenVideoIdsRef = useRef<Set<string>>(new Set());
 
     // --- Pre-loading Logic ---
-    // Only mount current video and the NEXT video.
+    // Mount the previous, current, and next video for seamless navigation.
     const getVisibleIndices = () => {
-        return [currentIndex, currentIndex + 1];
+        const indices = [currentIndex];
+        if (currentIndex > 0) {
+            indices.unshift(currentIndex - 1); // Previous
+        }
+        if (currentIndex < videos.length - 1) {
+            indices.push(currentIndex + 1); // Next
+        }
+        return indices;
     };
 
     const sendCommand = (iframe: HTMLIFrameElement, command: 'playVideo' | 'pauseVideo') => {
@@ -69,18 +75,14 @@ const ShortsPage: React.FC = () => {
         }
     };
 
-    // 再生制御の統合管理
-    // currentIndexが変わるたびに、Activeな動画を再生し、それ以外を確実に停止する
     useEffect(() => {
         const currentVideo = videos[currentIndex];
         if (!currentVideo) return;
 
         iframeRefs.current.forEach((iframe, id) => {
             if (id === currentVideo.id) {
-                // Active: Play
                 sendCommand(iframe, 'playVideo');
             } else {
-                // Inactive: Pause
                 sendCommand(iframe, 'pauseVideo');
             }
         });
@@ -101,7 +103,8 @@ const ShortsPage: React.FC = () => {
                 });
                 
                 setVideos(prev => {
-                    const newUniqueShorts = shorts.filter(s => !seenVideoIdsRef.current.has(s.id));
+                    const existingIds = new Set(prev.map(v => v.id));
+                    const newUniqueShorts = shorts.filter(s => !existingIds.has(s.id));
                     newUniqueShorts.forEach(s => seenVideoIdsRef.current.add(s.id));
                     return [...prev, ...newUniqueShorts];
                 });
@@ -194,7 +197,7 @@ const ShortsPage: React.FC = () => {
     useEffect(() => {
         if (videos.length > 0 && context?.type !== 'channel') {
             const remainingVideos = videos.length - 1 - currentIndex;
-            if (remainingVideos < 10 && !isFetchingMore && !isLoading) {
+            if (remainingVideos < 15 && !isFetchingMore && !isLoading) {
                 fetchMoreShorts();
             }
         }
@@ -233,8 +236,6 @@ const ShortsPage: React.FC = () => {
     
     const getParamsForVideo = (index: number, videoId: string) => {
         if (!playerParams) return '';
-        // CRITICAL FIX: autoplay=0 ensures video doesn't start until we send postMessage.
-        // This prevents multiple audio streams from preloaded videos.
         let params = playerParams.replace(/&?autoplay=[01]/g, "") + "&playsinline=1&autoplay=0&enablejsapi=1";
         params += `&loop=1&playlist=${videoId}`;
         return params;
@@ -303,24 +304,31 @@ const ShortsPage: React.FC = () => {
 
     return (
         <div className={`shorts-container flex justify-center items-center h-[calc(100vh-3.5rem)] w-full overflow-hidden relative ${theme.includes('glass') ? 'bg-transparent' : 'bg-yt-white dark:bg-yt-black'}`}>
+            <button
+                onClick={handlePrev}
+                disabled={currentIndex === 0}
+                className={`absolute left-4 md:left-[calc(50%-25rem)] top-1/2 -translate-y-1/2 z-20 p-3 rounded-full bg-black/20 hover:bg-black/40 backdrop-blur-sm transition-all shadow-lg hidden md:flex items-center justify-center ${currentIndex === 0 ? 'opacity-0 cursor-not-allowed' : 'opacity-70 hover:opacity-100 hover:scale-110 active:scale-95'}`}
+                title="前の動画"
+            >
+                <ChevronUpIcon />
+            </button>
+
             <div className="relative flex items-center justify-center gap-4 h-full w-full max-w-7xl mx-auto px-2 sm:px-4">
                 {/* Main Player Container - Renders list but hides non-active */}
                 <div className="relative h-[85vh] max-h-[900px] aspect-[9/16] rounded-2xl shadow-2xl overflow-hidden bg-black flex-shrink-0 z-10">
                      {videos.map((video, index) => {
-                         // Unmount if far away to save memory
-                         if (Math.abs(currentIndex - index) > 2) return null;
+                         // Unmount if too far away to save memory
+                         if (Math.abs(currentIndex - index) > 1) return null;
                          
                          const isActive = index === currentIndex;
-                         const isVisible = visibleIndices.includes(index);
                          
                          return (
                              <div 
                                 key={video.id} 
                                 className="absolute inset-0 w-full h-full"
                                 style={{ 
-                                    display: isVisible ? 'block' : 'none',
+                                    visibility: isActive ? 'visible' : 'hidden',
                                     zIndex: isActive ? 2 : 1, // Active on top
-                                    visibility: isVisible ? 'visible' : 'hidden'
                                 }}
                              >
                                  <ShortsPlayer 
@@ -332,7 +340,6 @@ const ShortsPage: React.FC = () => {
                                     video={video} 
                                     playerParams={getParamsForVideo(index, video.id)} 
                                     onLoad={(e) => {
-                                        // When iframe loads, if it's the active index, send play command immediately.
                                         if (index === currentIndex) {
                                             const iframe = e.currentTarget;
                                             sendCommand(iframe, 'playVideo');
@@ -360,25 +367,6 @@ const ShortsPage: React.FC = () => {
                             <BlockIcon /><span className="text-xs font-semibold text-black dark:text-white mt-1 hidden md:block">非表示</span>
                         </button>
                     </div>
-
-                    <div className="flex flex-col gap-4 mt-auto hidden md:flex">
-                        <button 
-                            onClick={handlePrev} 
-                            disabled={currentIndex === 0} 
-                            className={`p-3 rounded-full bg-yt-light/50 dark:bg-yt-light-black/50 hover:bg-yt-light dark:hover:bg-yt-light-black backdrop-blur-sm transition-all shadow-lg ${currentIndex === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:scale-110 active:scale-95'}`}
-                            title="前の動画"
-                        >
-                            <ChevronUpIcon />
-                        </button>
-                        <button 
-                            onClick={handleNext} 
-                            disabled={currentIndex >= videos.length - 1 && !isFetchingMore} 
-                            className={`p-3 rounded-full bg-yt-light/50 dark:bg-yt-light-black/50 hover:bg-yt-light dark:hover:bg-yt-light-black backdrop-blur-sm transition-all shadow-lg ${currentIndex >= videos.length - 1 && !isFetchingMore ? 'opacity-30 cursor-not-allowed' : 'hover:scale-110 active:scale-95'}`}
-                            title="次の動画"
-                        >
-                            <ChevronDownIcon />
-                        </button>
-                    </div>
                 </div>
 
                 {/* Comment Drawer */}
@@ -399,6 +387,15 @@ const ShortsPage: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            <button
+                onClick={handleNext}
+                disabled={currentIndex >= videos.length - 1 && !isFetchingMore}
+                className={`absolute right-4 md:right-[calc(50%-25rem)] top-1/2 -translate-y-1/2 z-20 p-3 rounded-full bg-black/20 hover:bg-black/40 backdrop-blur-sm transition-all shadow-lg hidden md:flex items-center justify-center ${currentIndex >= videos.length - 1 && !isFetchingMore ? 'opacity-0 cursor-not-allowed' : 'opacity-70 hover:opacity-100 hover:scale-110 active:scale-95'}`}
+                title="次の動画"
+            >
+                <ChevronDownIcon />
+            </button>
         </div>
     );
 };
