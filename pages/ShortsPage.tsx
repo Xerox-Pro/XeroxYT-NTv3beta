@@ -53,19 +53,6 @@ const ShortsPage: React.FC = () => {
     
     const seenVideoIdsRef = useRef<Set<string>>(new Set());
 
-    // --- Pre-loading Logic ---
-    // Mount the previous, current, and next video for seamless navigation.
-    const getVisibleIndices = () => {
-        const indices = [currentIndex];
-        if (currentIndex > 0) {
-            indices.unshift(currentIndex - 1); // Previous
-        }
-        if (currentIndex < videos.length - 1) {
-            indices.push(currentIndex + 1); // Next
-        }
-        return indices;
-    };
-
     const sendCommand = (iframe: HTMLIFrameElement, command: 'playVideo' | 'pauseVideo') => {
         if (iframe && iframe.contentWindow) {
             iframe.contentWindow.postMessage(
@@ -98,7 +85,7 @@ const ShortsPage: React.FC = () => {
                 const shorts = await getXraiShorts({ 
                     searchHistory, watchHistory, shortsHistory, subscribedChannels, 
                     ngKeywords, ngChannels, hiddenVideos, negativeKeywords, 
-                    page: Math.floor(videos.length / 20) + 1,
+                    page: Math.floor(videos.length / 30) + 1, // Adjusted for larger batch
                     seenIds: currentSeenIds
                 });
                 
@@ -197,7 +184,8 @@ const ShortsPage: React.FC = () => {
     useEffect(() => {
         if (videos.length > 0 && context?.type !== 'channel') {
             const remainingVideos = videos.length - 1 - currentIndex;
-            if (remainingVideos < 15 && !isFetchingMore && !isLoading) {
+            // 残りが10本を切ったら次のバッチを取得してストックする
+            if (remainingVideos < 10 && !isFetchingMore && !isLoading) {
                 fetchMoreShorts();
             }
         }
@@ -300,8 +288,6 @@ const ShortsPage: React.FC = () => {
     if (error) return <div className="text-center text-red-500 bg-red-100 dark:bg-red-900/50 p-4 rounded-lg m-4">{error}</div>;
     if (videos.length === 0 || !playerParams) return <div className="text-center p-8">No shorts found.</div>;
 
-    const visibleIndices = getVisibleIndices();
-
     return (
         <div className={`shorts-container flex justify-center items-center h-[calc(100vh-3.5rem)] w-full overflow-hidden relative ${theme.includes('glass') ? 'bg-transparent' : 'bg-yt-white dark:bg-yt-black'}`}>
             <button
@@ -317,8 +303,9 @@ const ShortsPage: React.FC = () => {
                 {/* Main Player Container - Renders list but hides non-active */}
                 <div className="relative h-[85vh] max-h-[900px] aspect-[9/16] rounded-2xl shadow-2xl overflow-hidden bg-black flex-shrink-0 z-10">
                      {videos.map((video, index) => {
-                         // Unmount if too far away to save memory
-                         if (Math.abs(currentIndex - index) > 1) return null;
+                         // Unmount if too far away to save memory (Keep Prev 2, Current, Next 2)
+                         // 前後2つまでプリロードして、ぐるぐる時間を減らす
+                         if (Math.abs(currentIndex - index) > 2) return null;
                          
                          const isActive = index === currentIndex;
                          

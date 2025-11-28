@@ -1,5 +1,6 @@
 
 
+
 import type { Video, Channel } from '../types';
 import { searchVideos, getRecommendedVideos, parseDuration } from './api';
 import { extractKeywords, calculateMagnitude } from './xrai';
@@ -160,7 +161,7 @@ export const getXraiShorts = async (sources: RecommendationSource & { seenIds?: 
     } = sources;
 
     // --- Configuration ---
-    const BATCH_SIZE = 20;
+    const BATCH_SIZE = 30; // Increased to ensure buffer
     const POPULAR_RATIO = 0.85; // 85% Popular Shorts target
     const targetPopularCount = Math.ceil(BATCH_SIZE * POPULAR_RATIO);
     const targetPersonalizedCount = BATCH_SIZE - targetPopularCount;
@@ -293,7 +294,6 @@ export const getXraiShorts = async (sources: RecommendationSource & { seenIds?: 
     };
 
     rankedPopular.slice(0, targetPopularCount).forEach(item => addVideoSafely(item, true));
-    // FIX: Corrected a typo where targetPersonalizedCount was being calculated using itself. It should use targetPopularCount.
     rankedPersonalized.slice(0, targetPersonalizedCount).forEach(item => addVideoSafely(item, false));
 
     let remainingNeeded = BATCH_SIZE - finalFeed.length;
