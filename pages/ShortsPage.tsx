@@ -33,6 +33,15 @@ const ShortsPage: React.FC = () => {
     const { ngKeywords, ngChannels, hiddenVideos, negativeKeywords, addHiddenVideo, addNgChannel } = usePreference();
     
     const wheelTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const autoplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const handleNext = useCallback(() => {
+        setCurrentIndex(prev => (prev < videos.length - 1 ? prev + 1 : prev));
+    }, [videos.length]);
+
+    const handlePrev = () => {
+        setCurrentIndex(prev => (prev > 0 ? prev - 1 : prev));
+    };
 
     const fetchShorts = useCallback(async (isInitial: boolean) => {
         if (!isInitial && isFetchingMore) return;
@@ -62,7 +71,7 @@ const ShortsPage: React.FC = () => {
                 if (shorts.length === 0) setError("ショート動画が見つかりませんでした。");
                 else setVideos(shorts);
             } else {
-                setVideos(prev => [...prev, ...shorts]);
+                setVideos(prev => [...prev, ...shorts.filter(s => !prev.some(p => p.id === s.id))]);
             }
 
         } catch (err: any) {
@@ -76,17 +85,20 @@ const ShortsPage: React.FC = () => {
 
     useEffect(() => { fetchShorts(true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
     
+    // Infinite scroll trigger
     useEffect(() => {
         if (videos.length > 0 && !isFetchingMore && currentIndex >= videos.length - 5) {
             fetchShorts(false);
         }
     }, [currentIndex, videos.length, isFetchingMore, fetchShorts]);
     
+    // Reset comments when video changes
     useEffect(() => {
         setShowComments(false);
         setComments([]);
     }, [currentIndex]);
 
+    // History & Autoplay logic
     useEffect(() => {
         const video = videos[currentIndex];
         if (!video) return;
@@ -96,30 +108,24 @@ const ShortsPage: React.FC = () => {
 
         const historyTimer = setTimeout(() => { addShortToHistory(video); }, (durationSec * 1000) / 2);
         
-        let autoplayTimer: ReturnType<typeof setTimeout>;
+        if (autoplayTimerRef.current) clearTimeout(autoplayTimerRef.current);
         if (isAutoplayOn && durationSec > 0) {
-            autoplayTimer = setTimeout(() => {
-                setCurrentIndex(prev => (prev < videos.length - 1 ? prev + 1 : prev));
+            autoplayTimerRef.current = setTimeout(() => {
+                handleNext();
             }, durationSec * 1000 + 500);
         }
 
         return () => {
             clearTimeout(historyTimer);
-            clearTimeout(autoplayTimer);
+            if (autoplayTimerRef.current) clearTimeout(autoplayTimerRef.current);
         };
-    }, [currentIndex, videos, addShortToHistory, isAutoplayOn]);
-
-    const handleNext = useCallback(() => {
-        setCurrentIndex(prev => (prev < videos.length - 1 ? prev + 1 : prev));
-    }, [videos.length]);
-
-    const handlePrev = () => {
-        setCurrentIndex(prev => (prev > 0 ? prev - 1 : prev));
-    };
+    }, [currentIndex, videos, addShortToHistory, isAutoplayOn, handleNext]);
     
     const handleToggleComments = async () => {
-        setShowComments(prev => !prev);
-        if (!showComments && comments.length === 0 && videos[currentIndex]) {
+        const willBeOpen = !showComments;
+        setShowComments(willBeOpen);
+
+        if (willBeOpen && comments.length === 0 && videos[currentIndex]) {
             setAreCommentsLoading(true);
             try {
                 const data = await getComments(videos[currentIndex].id);
@@ -134,14 +140,11 @@ const ShortsPage: React.FC = () => {
             v.id !== videoIdToRemove && (channelIdToRemove ? v.channelId !== channelIdToRemove : true)
         );
         
-        // If the current video was removed, decide where to go next
         if (videos[currentIndex]?.id === videoIdToRemove || (channelIdToRemove && videos[currentIndex]?.channelId === channelIdToRemove)) {
             if (currentIndex >= newVideos.length && newVideos.length > 0) {
-                setCurrentIndex(newVideos.length - 1); // Go to the new last item
+                setCurrentIndex(newVideos.length - 1);
             }
-            // else, the currentIndex is now pointing at the next item naturally
         } else {
-            // Recalculate index if an item before the current one was removed
             const currentVideoId = videos[currentIndex]?.id;
             const newIdx = newVideos.findIndex(v => v.id === currentVideoId);
             if (newIdx !== -1) setCurrentIndex(newIdx);
