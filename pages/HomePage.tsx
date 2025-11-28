@@ -85,8 +85,14 @@ const HomePage: React.FC = () => {
                     }
                     return combined;
                 });
-                if (uniqueNewShorts.length > 0 && shortsFeed.length < 50) { // Avoid bloating the shorts shelf on scroll
-                   setShortsFeed(prev => [...prev, ...uniqueNewShorts]);
+                if (uniqueNewShorts.length > 0) {
+                   setShortsFeed(prev => {
+                       if (prev.length < 50) {
+                           const combined = [...prev, ...uniqueNewShorts];
+                           return Array.from(new Map(combined.map(item => [item.id, item])).values());
+                       }
+                       return prev;
+                   });
                 }
             }
 
@@ -97,7 +103,7 @@ const HomePage: React.FC = () => {
             setIsLoading(false);
             setIsFetchingMore(false);
         }
-    }, [subscribedChannels, searchHistory, watchHistory, shortsHistory, ngKeywords, ngChannels, hiddenVideos, negativeKeywords, shortsFeed.length]);
+    }, [subscribedChannels, searchHistory, watchHistory, shortsHistory, ngKeywords, ngChannels, hiddenVideos, negativeKeywords]);
 
     useEffect(() => {
         setPage(1);
