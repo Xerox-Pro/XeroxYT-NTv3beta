@@ -31,7 +31,6 @@ const cleanTitleForSearch = (title: string): string => {
 export const getXraiRecommendations = async (sources: RecommendationSource): Promise<Video[]> => {
     const { 
         watchHistory, 
-        shortsHistory,
         subscribedChannels,
         ngKeywords,
         ngChannels,
@@ -39,97 +38,74 @@ export const getXraiRecommendations = async (sources: RecommendationSource): Pro
         negativeKeywords
     } = sources;
 
-    let seeds: string[] = [];
-    
+    const TARGET_COUNT = 50; // Target number of videos to return per batch
+    const TRENDING_RATIO = 0.40; // 40%
+
+    // 1. Fetch Personalized Videos
+    let personalizedSeeds: string[] = [];
     if (watchHistory.length > 0) {
-        const historySample = shuffleArray(watchHistory).slice(0, 10);
-        seeds = historySample.map(v => `${cleanTitleForSearch(v.title)} related`);
-    } else if (shortsHistory && shortsHistory.length > 0) {
-        const historySample = shuffleArray(shortsHistory).slice(0, 5);
-        seeds = historySample.map(v => `${cleanTitleForSearch(v.title)} related`);
+        const historySample = shuffleArray(watchHistory).slice(0, 5);
+        personalizedSeeds = historySample.map(v => `${cleanTitleForSearch(v.title)} related`);
     } else if (subscribedChannels.length > 0) {
-        const subSample = shuffleArray(subscribedChannels).slice(0, 5);
-        seeds = subSample.map(c => `${c.name} videos`);
+        const subSample = shuffleArray(subscribedChannels).slice(0, 3);
+        personalizedSeeds = subSample.map(c => `${c.name} videos`);
     } else {
-        seeds = ["Trending Japan", "Popular Music", "Gaming", "Cooking", "Vlog"];
+        personalizedSeeds = ["Music", "Gaming", "Vlog"]; // Fallback seeds
     }
 
-    const searchPromises = seeds.map(query => 
+    const searchPromises = personalizedSeeds.map(query => 
         searchVideos(query, '1').then(res => res.videos).catch(() => [])
     );
+    const personalizedResults = await Promise.all(searchPromises);
+    let personalizedCandidates = personalizedResults.flat();
     
+    // 2. Fetch Trending/Popular Videos
     const trendingPromise = getRecommendedVideos().then(res => res.videos).catch(() => []);
+    const trendingVideos = await trendingPromise;
 
-    const [nestedResults, trendingVideos] = await Promise.all([
-        Promise.all(searchPromises),
-        trendingPromise
-    ]);
-    
-    let candidates = nestedResults.flat();
-    
-    if (trendingVideos.length > 0) {
-        const selectedTrending = shuffleArray(trendingVideos).slice(0, 3);
-        candidates.push(...selectedTrending);
-    }
-
+    // 3. Combine and Filter
     const hiddenVideoIdsSet = new Set(hiddenVideos.map(v => v.id));
     const seenIds = new Set<string>(hiddenVideoIdsSet);
-    candidates = candidates.filter(v => {
-        if (seenIds.has(v.id)) return false;
-        seenIds.add(v.id);
-        return true;
-    });
+    
+    const filterAndDedupe = (videos: Video[]): Video[] => {
+        return videos.filter(v => {
+            if (seenIds.has(v.id)) return false;
+            seenIds.add(v.id);
 
-    if (watchHistory.length > 0 || (shortsHistory && shortsHistory.length > 0)) {
-        const historyKeywords = new Set<string>();
-        
-        watchHistory.slice(0, 50).forEach(v => {
-            extractKeywords(v.title).forEach(k => historyKeywords.add(k));
-            extractKeywords(v.channelName).forEach(k => historyKeywords.add(k));
-        });
-        
-        if (shortsHistory) {
-            shortsHistory.slice(0, 30).forEach(v => {
-                extractKeywords(v.title).forEach(k => historyKeywords.add(k));
-                extractKeywords(v.channelName).forEach(k => historyKeywords.add(k));
+            const fullText = `${v.title} ${v.channelName}`.toLowerCase();
+            const ngChannelIds = new Set(ngChannels.map(c => c.id));
+
+            if (ngKeywords.some(ng => fullText.includes(ng.toLowerCase()))) return false;
+            if (ngChannelIds.has(v.channelId)) return false;
+
+            const vKeywords = [...extractKeywords(v.title), ...extractKeywords(v.channelName)];
+            let negativeScore = 0;
+            vKeywords.forEach(k => {
+                if (negativeKeywords.has(k)) {
+                    negativeScore += (negativeKeywords.get(k) || 0);
+                }
             });
-        }
-
-        subscribedChannels.forEach(c => {
-            extractKeywords(c.name).forEach(k => historyKeywords.add(k));
+            if (negativeScore > 2) return false;
+            
+            return true;
         });
+    };
 
-        candidates = candidates.filter(candidate => {
-            const titleKeywords = extractKeywords(candidate.title);
-            const channelKeywords = extractKeywords(candidate.channelName);
-            const isRelevant = [...titleKeywords, ...channelKeywords].some(k => historyKeywords.has(k));
-            const isTrendingInjection = trendingVideos.some(tv => tv.id === candidate.id);
-            return isRelevant || isTrendingInjection;
-        });
-    }
+    const cleanTrending = filterAndDedupe(trendingVideos);
+    const cleanPersonalized = filterAndDedupe(personalizedCandidates);
 
-    const ngChannelIds = new Set(ngChannels.map(c => c.id));
-    candidates = candidates.filter(v => {
-        const fullText = `${v.title} ${v.channelName}`.toLowerCase();
-        
-        if (ngKeywords.some(ng => fullText.includes(ng.toLowerCase()))) return false;
-        if (ngChannelIds.has(v.channelId)) return false;
+    // 4. Mix according to ratio
+    const numTrending = Math.floor(TARGET_COUNT * TRENDING_RATIO);
+    const numPersonalized = TARGET_COUNT - numTrending;
 
-        const vKeywords = [...extractKeywords(v.title), ...extractKeywords(v.channelName)];
-        let negativeScore = 0;
-        vKeywords.forEach(k => {
-            if (negativeKeywords.has(k)) {
-                negativeScore += (negativeKeywords.get(k) || 0);
-            }
-        });
-        
-        if (negativeScore > 2) return false;
+    const finalTrending = shuffleArray(cleanTrending).slice(0, numTrending);
+    const finalPersonalized = shuffleArray(cleanPersonalized).slice(0, numPersonalized);
 
-        return true;
-    });
-
-    return shuffleArray(candidates);
+    const finalFeed = [...finalTrending, ...finalPersonalized];
+    
+    return shuffleArray(finalFeed);
 };
+
 
 export const getXraiShorts = async (sources: RecommendationSource): Promise<Video[]> => {
     const { 
@@ -137,66 +113,79 @@ export const getXraiShorts = async (sources: RecommendationSource): Promise<Vide
         shortsHistory,
         subscribedChannels,
         hiddenVideos,
+        ngChannels,
+        ngKeywords,
+        negativeKeywords
     } = sources;
 
-    let seeds: string[] = [];
+    const TARGET_COUNT = 40;
+    const POPULAR_RATIO = 0.75; // 75%
 
-    if (shortsHistory && shortsHistory.length > 0) {
-        const historySample = shuffleArray(shortsHistory).slice(0, 8);
-        seeds.push(...historySample.map(v => `${cleanTitleForSearch(v.title)} #shorts`));
-    } else if (watchHistory.length > 0) {
-        const historySample = shuffleArray(watchHistory).slice(0, 8);
-        seeds.push(...historySample.map(v => `${cleanTitleForSearch(v.title)} #shorts`));
-    }
-    
-    if (subscribedChannels.length > 0) {
-        const subSample = shuffleArray(subscribedChannels).slice(0, 5);
-        seeds.push(...subSample.map(c => `${c.name} #shorts`));
-    }
-    
-    if (seeds.length === 0) {
-        seeds = ["Funny #shorts", "Gaming #shorts", "LifeHacks #shorts", "Pets #shorts", "Trending Japan #shorts"];
-    }
-
-    const searchPromises = seeds.slice(0, 10).map(query => 
-        searchVideos(query, '1').then(res => [...res.videos, ...res.shorts]).catch(() => [])
-    );
-    
-    // Also fetch trending videos to inject some popular shorts
-    const trendingPromise = getRecommendedVideos().then(res => res.videos).catch(() => []);
-
-    const [nestedResults, trendingVideos] = await Promise.all([
-        Promise.all(searchPromises),
-        trendingPromise
-    ]);
-    
-    let candidates = nestedResults.flat();
-
-    // Inject ~10% trending shorts
-    const trendingShorts = trendingVideos.filter(v => {
+    const isShortVideo = (v: Video): boolean => {
         const seconds = parseDuration(v.isoDuration, v.duration);
         return (seconds > 0 && seconds <= 60) || v.title.toLowerCase().includes('#shorts');
-    });
+    };
 
-    if (trendingShorts.length > 0) {
-        const trendingCount = Math.max(1, Math.floor(candidates.length * 0.1));
-        const shortsToInject = shuffleArray(trendingShorts).slice(0, trendingCount);
-        candidates.push(...shortsToInject);
+    const historyIds = new Set((shortsHistory || []).map(v => v.id));
+    const hiddenVideoIdsSet = new Set(hiddenVideos.map(v => v.id));
+    const ngChannelIds = new Set(ngChannels.map(c => c.id));
+    const seenIds = new Set<string>();
+
+    const filterAndDedupe = (videos: Video[]): Video[] => {
+        return videos.filter(v => {
+            if (historyIds.has(v.id) || hiddenVideoIdsSet.has(v.id) || seenIds.has(v.id)) return false;
+            
+            const fullText = `${v.title} ${v.channelName}`.toLowerCase();
+            if (ngKeywords.some(ng => fullText.includes(ng.toLowerCase()))) return false;
+            if (ngChannelIds.has(v.channelId)) return false;
+
+            const vKeywords = [...extractKeywords(v.title), ...extractKeywords(v.channelName)];
+            let negativeScore = 0;
+            vKeywords.forEach(k => {
+                if (negativeKeywords.has(k)) negativeScore += (negativeKeywords.get(k) || 0);
+            });
+            if (negativeScore > 2) return false;
+
+            seenIds.add(v.id);
+            return true;
+        });
+    };
+
+    const popularPromise = getRecommendedVideos().then(res => res.videos.filter(isShortVideo)).catch(() => []);
+    
+    let personalizedSeeds: string[] = [];
+    if (shortsHistory && shortsHistory.length > 0) {
+        personalizedSeeds = shuffleArray(shortsHistory).slice(0, 4).map(v => `${cleanTitleForSearch(v.title)} #shorts`);
+    } else if (watchHistory.length > 0) {
+        personalizedSeeds = shuffleArray(watchHistory).slice(0, 4).map(v => `${cleanTitleForSearch(v.title)} #shorts`);
+    } else {
+        personalizedSeeds = ["Funny #shorts", "Gaming #shorts"];
     }
 
-    const hiddenVideoIdsSet = new Set(hiddenVideos.map(v => v.id));
-    const seenIds = new Set<string>(hiddenVideoIdsSet);
+    const personalizedPromises = personalizedSeeds.map(query => 
+        searchVideos(query, '1').then(res => [...res.videos, ...res.shorts].filter(isShortVideo)).catch(() => [])
+    );
+    
+    const [popularShortsRaw, personalizedShortsNested] = await Promise.all([
+        popularPromise,
+        Promise.all(personalizedPromises)
+    ]);
+    const personalizedShortsRaw = personalizedShortsNested.flat();
 
-    const finalCandidates = candidates.filter(v => {
-        if (seenIds.has(v.id)) return false;
-        
-        const seconds = parseDuration(v.isoDuration, v.duration);
-        const isShort = (seconds > 0 && seconds <= 60) || v.title.toLowerCase().includes('#shorts');
-        if (!isShort) return false;
+    const cleanPopular = filterAndDedupe(popularShortsRaw);
+    const cleanPersonalized = filterAndDedupe(personalizedShortsRaw);
+    
+    const numPopular = Math.floor(TARGET_COUNT * POPULAR_RATIO);
+    const numPersonalized = TARGET_COUNT - numPopular;
 
-        seenIds.add(v.id);
-        return true;
-    });
+    const finalPopular = shuffleArray(cleanPopular).slice(0, numPopular);
+    const finalPersonalized = shuffleArray(cleanPersonalized).slice(0, numPersonalized);
 
-    return shuffleArray(finalCandidates);
+    const finalFeed = [...finalPopular, ...finalPersonalized];
+
+    if (finalFeed.length === 0) {
+        return shuffleArray(popularShortsRaw.filter(v => !historyIds.has(v.id))).slice(0, 20);
+    }
+
+    return shuffleArray(finalFeed);
 };

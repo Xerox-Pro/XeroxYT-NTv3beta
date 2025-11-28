@@ -34,7 +34,6 @@ const ShortsPage: React.FC = () => {
     const { ngKeywords, ngChannels, hiddenVideos, negativeKeywords, addHiddenVideo, addNgChannel } = usePreference();
     
     const loadedRef = useRef(false);
-    // FIX: Replaced NodeJS.Timeout with ReturnType<typeof setTimeout> for browser compatibility.
     const wheelTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const loadShorts = useCallback(async () => {
@@ -82,7 +81,6 @@ const ShortsPage: React.FC = () => {
 
         const historyTimer = setTimeout(() => { addShortToHistory(video); }, (durationSec * 1000) / 2);
         
-        // FIX: Replaced NodeJS.Timeout with ReturnType<typeof setTimeout> for browser compatibility.
         let autoplayTimer: ReturnType<typeof setTimeout> | null = null;
         if (isAutoplayOn) {
             autoplayTimer = setTimeout(() => { handleNext(); }, durationSec * 1000 + 500); // Add 500ms buffer
@@ -161,9 +159,9 @@ const ShortsPage: React.FC = () => {
 
     return (
         <div className={`shorts-container flex justify-center items-center h-[calc(100vh-3.5rem)] w-full overflow-hidden relative ${bgClass}`}>
-            <div className="relative flex items-end justify-center gap-4 h-full pb-8">
+            <div className="relative flex items-center justify-center gap-4 h-full pb-8">
                 <div className="relative h-[80vh] aspect-[9/16] rounded-2xl shadow-2xl overflow-hidden bg-black flex-shrink-0 z-10">
-                     <ShortsPlayer video={currentVideo} playerParams={extendedParams} />
+                     <ShortsPlayer key={currentVideo.id} video={currentVideo} playerParams={extendedParams} />
                 </div>
 
                 <div className="flex flex-col gap-5 pb-2 z-10">
