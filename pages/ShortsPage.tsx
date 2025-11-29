@@ -303,7 +303,7 @@ const ShortsPage: React.FC = () => {
             <button
                 onClick={handlePrev}
                 disabled={currentIndex === 0}
-                className={`absolute left-4 md:left-[calc(50%-25rem)] top-1/2 -translate-y-1/2 z-20 p-4 rounded-full bg-black/20 hover:bg-black/40 backdrop-blur-sm transition-all shadow-lg hidden md:flex items-center justify-center ${currentIndex === 0 ? 'opacity-0 cursor-not-allowed' : 'opacity-70 hover:opacity-100 hover:scale-110 active:scale-95'}`}
+                className={`absolute left-4 md:left-[calc(50%-25rem)] top-1/2 -translate-y-1/2 z-20 p-4 rounded-full bg-black/20 hover:bg-black/40 backdrop-blur-sm transition-all shadow-lg flex items-center justify-center ${currentIndex === 0 ? 'opacity-0 cursor-not-allowed' : 'opacity-70 hover:opacity-100 hover:scale-110 active:scale-95'}`}
                 title="前の動画"
             >
                 <ChevronUpIcon />
@@ -386,7 +386,7 @@ const ShortsPage: React.FC = () => {
             <button
                 onClick={handleNext}
                 disabled={currentIndex >= videos.length - 1 && !isFetchingMore}
-                className={`absolute right-4 md:right-[calc(50%-25rem)] top-1/2 -translate-y-1/2 z-20 p-4 rounded-full bg-black/20 hover:bg-black/40 backdrop-blur-sm transition-all shadow-lg hidden md:flex items-center justify-center ${currentIndex >= videos.length - 1 && !isFetchingMore ? 'opacity-0 cursor-not-allowed' : 'opacity-70 hover:opacity-100 hover:scale-110 active:scale-95'}`}
+                className={`absolute right-4 md:right-[calc(50%-25rem)] top-1/2 -translate-y-1/2 z-20 p-4 rounded-full bg-black/20 hover:bg-black/40 backdrop-blur-sm transition-all shadow-lg flex items-center justify-center ${currentIndex >= videos.length - 1 && !isFetchingMore ? 'opacity-0 cursor-not-allowed' : 'opacity-70 hover:opacity-100 hover:scale-110 active:scale-95'}`}
                 title="次の動画"
             >
                 <ChevronDownIcon />
