@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 // FIX: Use named imports for react-router-dom components and hooks.
 import { useParams, Link } from 'react-router-dom';
-import { getChannelDetails, getChannelVideos, getChannelHome, mapHomeVideoToVideo, getChannelShorts } from '../utils/api';
+import { getChannelDetails, getChannelVideos, getChannelHome, mapHomeVideoToVideo, getChannelShorts, getPlayerConfig } from '../utils/api';
 import type { ChannelDetails, Video, Channel, ChannelHomeData } from '../types';
 import VideoGrid from '../components/VideoGrid';
 import VideoCard from '../components/VideoCard';
@@ -30,8 +30,17 @@ const ChannelPage: React.FC = () => {
     const [isFetchingMore, setIsFetchingMore] = useState(false);
     const [isTabLoading, setIsTabLoading] = useState(false);
     
+    const [playerParams, setPlayerParams] = useState<string | null>(null);
+
     const { isSubscribed, subscribe, unsubscribe } = useSubscription();
     const { addNgChannel, removeNgChannel, isNgChannel } = usePreference();
+    
+    useEffect(() => {
+        const fetchPlayerParams = async () => {
+            setPlayerParams(await getPlayerConfig());
+        };
+        fetchPlayerParams();
+    }, []);
 
     useEffect(() => {
         const loadInitialDetails = async () => {
@@ -204,16 +213,23 @@ const ChannelPage: React.FC = () => {
                 {homeData.topVideo && (
                     <div className="border-b border-yt-spec-light-20 dark:border-yt-spec-20 pb-8 mb-8">
                         <div className="flex flex-col lg:flex-row gap-6">
-                            {/* Thumbnail on the left */}
-                            <Link to={`/watch/${homeData.topVideo.videoId}`} className="lg:w-1/2 xl:w-[48%] flex-shrink-0 group block">
+                            {/* Player on the left */}
+                            <div className="lg:w-1/2 xl:w-[48%] flex-shrink-0">
                                 <div className="aspect-video rounded-2xl overflow-hidden bg-yt-dark-gray shadow-lg">
-                                    <img 
-                                        src={homeData.topVideo.thumbnail} 
-                                        alt={homeData.topVideo.title} 
-                                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
-                                    />
+                                    {playerParams ? (
+                                        <iframe
+                                            src={`https://www.youtubeeducation.com/embed/${homeData.topVideo.videoId}${playerParams}`}
+                                            title={homeData.topVideo.title}
+                                            frameBorder="0"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                            className="w-full h-full"
+                                        ></iframe>
+                                    ) : (
+                                        <div className="w-full h-full bg-yt-dark-gray animate-pulse"></div>
+                                    )}
                                 </div>
-                            </Link>
+                            </div>
                             {/* Details on the right */}
                             <div className="flex flex-col justify-center">
                                 <Link to={`/watch/${homeData.topVideo.videoId}`} className="block mb-2">

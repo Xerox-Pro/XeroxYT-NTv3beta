@@ -78,7 +78,11 @@ const ShortsShelf: React.FC<ShortsShelfProps> = ({ shorts, isLoading }) => {
               {isLoading ? (
                 Array.from({ length: 10 }).map((_, index) => <ShortsCardSkeleton key={index} />)
               ) : (
-                shorts.map(video => <ShortsCard key={video.id} video={video} context={{ type: 'home' }} />)
+                shorts.map(video => (
+                  <div key={video.id} className="w-44 flex-shrink-0">
+                    <ShortsCard video={video} context={{ type: 'home' }} />
+                  </div>
+                ))
               )}
             </div>
         </div>
