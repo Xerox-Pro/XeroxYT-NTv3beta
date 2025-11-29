@@ -363,31 +363,69 @@ app.get('/api/playlist', async (req, res) => {
   }
 });
 
-/app.get('/api/fshorts', async (req, res) => {
+// -------------------------------------------------------------------
+// ゲストモード Shorts 抽出 API (/api/fshorts)
+// ホームフィードから Shorts だけ取り出す
+// -------------------------------------------------------------------
+app.get('/api/fshorts', async (req, res) => {
   try {
-    const { page = '1' } = req.query;
-    const targetPage = Math.max(1, parseInt(page, 10) || 1);
-
-    // ログイン Cookie を渡す
-    const youtube = await Innertube.create({
-      cookies: process.env.YT_COOKIE, // サーバー環境変数に保存
-      lang: 'ja',
-      location: 'JP'
-    });
+    const youtube = await createYoutube();
+    const { page = '1', limit = '10' } = req.query;
 
     let feed = await youtube.getHomeFeed();
+
+    // ページ送り処理
+    let targetPage = parseInt(page);
     let currentPage = 1;
+
     while (currentPage < targetPage && feed.has_continuation) {
       feed = await feed.getContinuation();
       currentPage++;
     }
 
-    const raw = JSON.parse(JSON.stringify(feed));
-    res.status(200).json({ page: targetPage, hasMore: !!feed.has_continuation, raw });
+    // ------------------------------
+    // Shorts 抽出処理
+    // ------------------------------
+    const shorts = [];
+
+    const extractShorts = (obj) => {
+      if (!obj) return;
+
+      if (Array.isArray(obj)) {
+        obj.forEach(extractShorts);
+        return;
+      }
+
+      // Shorts セクション
+      if (obj.type === "Shorts") {
+        if (Array.isArray(obj.items)) {
+          shorts.push(...obj.items);
+        }
+      }
+
+      // 深いネストに備える
+      if (typeof obj === "object") {
+        for (const key in obj) {
+          extractShorts(obj[key]);
+        }
+      }
+    };
+
+    extractShorts(feed);
+
+    const max = parseInt(limit);
+    const resultShorts = shorts.slice(0, max);
+
+    res.status(200).json({
+      page: targetPage,
+      count: resultShorts.length,
+      hasMore: feed.has_continuation,
+      shorts: resultShorts
+    });
 
   } catch (err) {
-    console.error("Error in /api/fshorts (logged-in):", err);
-    res.status(500).json({ error: String(err) });
+    console.error("Error in /api/fshorts:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
