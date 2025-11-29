@@ -319,11 +319,11 @@ const ShortsPage: React.FC = () => {
     return (
         <div className={`shorts-container flex justify-center items-center h-[calc(100vh-3.5rem)] w-full overflow-hidden relative ${theme.includes('glass') ? 'bg-transparent' : 'bg-yt-white dark:bg-yt-black'}`}>
             
-            {/* Previous Button - Fixed Left Position */}
+            {/* Previous Button - Fixed Position Relative to Center */}
             <button
                 onClick={handlePrev}
                 disabled={currentIndex === 0}
-                className={`fixed left-6 md:left-8 lg:left-24 top-1/2 -translate-y-1/2 z-50 p-4 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md transition-all shadow-xl border border-white/10 hidden md:flex items-center justify-center group ${currentIndex === 0 ? 'opacity-0 cursor-not-allowed' : 'opacity-80 hover:opacity-100 hover:scale-110 active:scale-95'}`}
+                className={`fixed left-4 md:left-[calc(50%-380px)] top-1/2 -translate-y-1/2 z-50 p-4 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md transition-all shadow-xl border border-white/10 hidden md:flex items-center justify-center group ${currentIndex === 0 ? 'opacity-0 cursor-not-allowed' : 'opacity-80 hover:opacity-100 hover:scale-110 active:scale-95'}`}
                 aria-label="前の動画"
             >
                 <ChevronUpIcon />
@@ -408,11 +408,11 @@ const ShortsPage: React.FC = () => {
                 )}
             </div>
 
-            {/* Next Button - Fixed Right Position */}
+            {/* Next Button - Fixed Position Relative to Center */}
             <button
                 onClick={handleNext}
                 disabled={currentIndex >= videos.length - 1 && !isFetchingMore}
-                className={`fixed right-6 md:right-8 lg:right-24 top-1/2 -translate-y-1/2 z-50 p-4 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md transition-all shadow-xl border border-white/10 hidden md:flex items-center justify-center group ${currentIndex >= videos.length - 1 && !isFetchingMore ? 'opacity-0 cursor-not-allowed' : 'opacity-80 hover:opacity-100 hover:scale-110 active:scale-95'}`}
+                className={`fixed right-4 md:right-[calc(50%-380px)] top-1/2 -translate-y-1/2 z-50 p-4 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md transition-all shadow-xl border border-white/10 hidden md:flex items-center justify-center group ${currentIndex >= videos.length - 1 && !isFetchingMore ? 'opacity-0 cursor-not-allowed' : 'opacity-80 hover:opacity-100 hover:scale-110 active:scale-95'}`}
                 title="次の動画"
             >
                 <ChevronDownIcon />
