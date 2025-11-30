@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { usePlaylist } from '../contexts/PlaylistContext';
 import type { Video } from '../types';
 import { CloseIcon, AddToPlaylistIcon } from './icons/Icons';
@@ -35,9 +36,9 @@ const PlaylistModal: React.FC<PlaylistModalProps> = ({ isOpen, onClose, video })
         }
     };
 
-    return (
+    const modalContent = (
         <div 
-            className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-[100] animate-fade-in"
+            className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[1000] animate-fade-in"
             onClick={onClose}
         >
             <div 
@@ -110,6 +111,8 @@ const PlaylistModal: React.FC<PlaylistModalProps> = ({ isOpen, onClose, video })
             </div>
         </div>
     );
+
+    return createPortal(modalContent, document.body);
 };
 
 export default PlaylistModal;

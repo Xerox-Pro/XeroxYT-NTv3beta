@@ -78,6 +78,10 @@ const PlaylistPage: React.FC = () => {
     const isGlassTheme = theme.includes('glass');
     const panelBgClass = isGlassTheme ? 'glass-panel text-black dark:text-white' : 'bg-white/20 dark:bg-black/40 backdrop-blur-md border border-white/10 shadow-2xl text-black dark:text-white';
 
+    const secondaryButtonClass = isGlassTheme 
+        ? 'bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-black dark:text-white'
+        : 'bg-yt-light dark:bg-yt-dark-gray hover:bg-yt-spec-light-20 dark:hover:bg-yt-gray text-black dark:text-white';
+
     return (
         <div className={`min-h-screen ${isGlassTheme ? '' : 'bg-yt-white dark:bg-yt-black'} text-black dark:text-white transition-colors duration-300`}>
             {/* Background Gradient Blur */}
@@ -165,7 +169,7 @@ const PlaylistPage: React.FC = () => {
                                     </Link>
                                     <Link 
                                         to={`/watch/${firstVideoId}?list=${playlist.id}&shuffle=1`}
-                                        className="flex-1 bg-yt-light dark:bg-yt-dark-gray hover:bg-yt-spec-light-20 dark:hover:bg-yt-gray text-black dark:text-white rounded-full py-2.5 px-4 font-bold text-sm flex items-center justify-center gap-2 transition-colors"
+                                        className={`flex-1 rounded-full py-2.5 px-4 font-bold text-sm flex items-center justify-center gap-2 transition-colors ${secondaryButtonClass}`}
                                     >
                                         <ShuffleIcon className="fill-current text-black dark:text-white w-5 h-5" />
                                         <span>シャッフル</span>
