@@ -1,4 +1,3 @@
-
 import express from "express";
 import { Innertube } from "youtubei.js";
 
@@ -19,6 +18,56 @@ const createYoutube = async () => {
     location: "JP",
   });
 };
+
+// -------------------------------------------------------------------
+// ストリーム Proxy API (/api/stream/:videoId)
+// -------------------------------------------------------------------
+app.get('/api/stream/:videoId', async (req, res) => {
+  try {
+    const { videoId } = req.params;
+    if (!videoId) return res.status(400).json({ error: "Missing video id" });
+
+    // ターゲットURL
+    const targetUrl = `https://siawaseok.duckdns.org/api/stream/${videoId}/type2`;
+
+    // 外部APIから取得 (fetchはNode 18+以上で標準使用可能)
+    const response = await fetch(targetUrl);
+
+    // ステータスコードを転送
+    res.status(response.status);
+
+    // ヘッダーを転送 (Content-Type, Content-Length等)
+    response.headers.forEach((val, key) => {
+      // 一部の制御ヘッダーは除外が必要な場合がありますが、基本的には転送します
+      res.setHeader(key, val);
+    });
+
+    if (!response.body) {
+      return res.end();
+    }
+
+    // Web Standard Stream (fetch) を Node.js Stream (res) にパイプする処理
+    // @ts-ignore: Node環境のFetch Bodyの型定義対策
+    const reader = response.body.getReader();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      // 取得したチャンクをクライアントへ書き込み
+      res.write(value);
+    }
+    res.end();
+
+  } catch (err) {
+    console.error('Error in /api/stream:', err);
+    // すでにヘッダーを送っていない場合のみエラーJSONを返す
+    if (!res.headersSent) {
+        res.status(500).json({ error: err.message });
+    } else {
+        res.end();
+    }
+  }
+});
 
 // -------------------------------------------------------------------
 // 動画詳細 API (/api/video)
