@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, Link, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useParams, Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { getVideoDetails, getPlayerConfig, getComments, getVideosByIds, getExternalRelatedVideos } from '../utils/api';
 import type { VideoDetails, Video, Comment, Channel } from '../types';
 import { useSubscription } from '../contexts/SubscriptionContext';
@@ -15,6 +15,7 @@ import { LikeIcon, SaveIcon, MoreIconHorizontal, ShareIcon, DislikeIcon, Chevron
 
 const VideoPlayerPage: React.FC = () => {
     const { videoId } = useParams<{ videoId: string }>();
+    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const playlistId = searchParams.get('list');
 
@@ -162,15 +163,71 @@ const VideoPlayerPage: React.FC = () => {
         if (!videoDetails?.id || !playerParams) return '';
         let src = `https://www.youtubeeducation.com/embed/${videoDetails.id}`;
         let params = playerParams.startsWith('?') ? playerParams.substring(1) : playerParams;
-        if (currentPlaylist && playlistVideos.length > 0) {
-            const videoIdList = (isShuffle ? shuffledPlaylistVideos : playlistVideos).map(v => v.id);
-            const playlistString = videoIdList.join(',');
-            params += `&playlist=${playlistString}`;
-            if(isLoop) params += `&loop=1`;
+        
+        // Ensure enablejsapi=1 is present for event listening
+        if (!params.includes('enablejsapi')) {
+            params += '&enablejsapi=1';
         }
+        // Add origin to ensure we can receive messages from the iframe
+        if (!params.includes('origin')) {
+            params += `&origin=${window.location.origin}`;
+        }
+        
+        // Note: We deliberately DO NOT add the &playlist= parameter here.
+        // We handle playlist navigation manually via React Router to ensure
+        // the page title, comments, and related videos update correctly when the video changes.
+        
         return `${src}?${params}`;
-    }, [videoDetails, playerParams, currentPlaylist, playlistVideos, isShuffle, isLoop, shuffledPlaylistVideos]);
+    }, [videoDetails, playerParams]);
     
+    // Function to handle navigation to the next video
+    const navigateToNextVideo = useCallback(() => {
+        if (!currentPlaylist || playlistVideos.length === 0) return;
+
+        const currentList = isShuffle ? shuffledPlaylistVideos : playlistVideos;
+        const currentIndex = currentList.findIndex(v => v.id === videoId);
+        
+        if (currentIndex === -1) return;
+
+        let nextIndex = currentIndex + 1;
+        if (nextIndex >= currentList.length) {
+            if (isLoop) {
+                nextIndex = 0;
+            } else {
+                return; // End of playlist
+            }
+        }
+        
+        const nextVideo = currentList[nextIndex];
+        if (nextVideo) {
+             const newParams = new URLSearchParams(searchParams);
+             if (isShuffle) newParams.set('shuffle', '1');
+             if (isLoop) newParams.set('loop', '1');
+             
+             navigate(`/watch/${nextVideo.id}?${newParams.toString()}`);
+        }
+    }, [currentPlaylist, playlistVideos, isShuffle, shuffledPlaylistVideos, videoId, isLoop, navigate, searchParams]);
+
+    // Listen for YouTube Iframe API 'onStateChange' events to detect video end
+    useEffect(() => {
+        const handleMessage = (event: MessageEvent) => {
+            try {
+                if (typeof event.data === 'string') {
+                    const data = JSON.parse(event.data);
+                    // data.info === 0 corresponds to YT.PlayerState.ENDED
+                    if (data.event === 'onStateChange' && data.info === 0) {
+                        navigateToNextVideo();
+                    }
+                }
+            } catch (e) {
+                // Ignore non-JSON messages
+            }
+        };
+
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, [navigateToNextVideo]);
+
     const updateUrlParams = (key: string, value: string | null) => {
         const newSearchParams = new URLSearchParams(searchParams);
         if (value === null) newSearchParams.delete(key);
