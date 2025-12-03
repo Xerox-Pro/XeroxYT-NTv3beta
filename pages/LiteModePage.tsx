@@ -7,6 +7,7 @@ const LiteModePage: React.FC = () => {
     const [urlInput, setUrlInput] = useState('');
     const [videoId, setVideoId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [loadingAction, setLoadingAction] = useState<'embed' | 'stream' | 'download' | null>(null);
     const [progress, setProgress] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const [streamData, setStreamData] = useState<any | null>(null);
@@ -68,6 +69,7 @@ const LiteModePage: React.FC = () => {
 
         setError(null);
         setIsLoading(true);
+        setLoadingAction(actionType);
         startFakeProgress();
 
         try {
@@ -106,7 +108,10 @@ const LiteModePage: React.FC = () => {
             setActiveView('none');
         } finally {
             stopFakeProgress();
-            setTimeout(() => setIsLoading(false), 500);
+            setTimeout(() => {
+                setIsLoading(false);
+                setLoadingAction(null);
+            }, 500);
         }
     };
 
@@ -172,21 +177,21 @@ const LiteModePage: React.FC = () => {
                         disabled={isLoading}
                         className="bg-[#7c3aed] text-white border-none rounded-[8px] px-6 py-3 text-[1.1rem] font-semibold cursor-pointer shadow-[0_2px_8px_rgba(124,58,237,0.06)] hover:bg-[#5e3fd7] disabled:opacity-50"
                     >
-                        {isLoading && activeView === 'player' ? `処理中... ${progress}%` : 'youtube player'}
+                        {isLoading && loadingAction === 'embed' ? `処理中... ${progress}%` : 'youtube player'}
                     </button>
                     <button 
-                        onClick={() => handleAction('stream')}
+                        onClick={() => handleAction('stream')} 
                         disabled={isLoading}
                         className="bg-[#7c3aed] text-white border-none rounded-[8px] px-6 py-3 text-[1.1rem] font-semibold cursor-pointer shadow-[0_2px_8px_rgba(124,58,237,0.06)] hover:bg-[#5e3fd7] disabled:opacity-50"
                     >
-                        {isLoading && activeView === 'player' ? `処理中... ${progress}%` : 'ストリーミング'}
+                        {isLoading && loadingAction === 'stream' ? `処理中... ${progress}%` : 'ストリーミング'}
                     </button>
                     <button 
-                        onClick={() => handleAction('download')}
+                        onClick={() => handleAction('download')} 
                         disabled={isLoading}
                         className="bg-[#10b981] text-white border-none rounded-[8px] px-6 py-3 text-[1.1rem] font-semibold cursor-pointer shadow-[0_2px_8px_rgba(16,185,129,0.06)] hover:bg-[#059669] disabled:opacity-50"
                     >
-                        {isLoading && activeView === 'download' ? `処理中... ${progress}%` : 'ダウンロード'}
+                        {isLoading && loadingAction === 'download' ? `処理中... ${progress}%` : 'ダウンロード'}
                     </button>
                 </div>
 
