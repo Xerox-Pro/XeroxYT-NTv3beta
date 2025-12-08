@@ -136,17 +136,56 @@ app.get('/api/video', async (req, res) => {
 // -------------------------------------------------------------------
 // 検索 API (/api/search)
 // -------------------------------------------------------------------
-app.get('/api/search', async (req, res) => {
+app.get('/api/search/:filterPath?', async (req, res) => {
   try {
     const youtube = await createYoutube();
-    const { q: query, page = '1' } = req.query;
-    if (!query) return res.status(400).json({ error: "Missing search query" });
+
+    let { q: rawQuery = "", page = "1" } = req.query;
+    const { filterPath } = req.params;
 
     const targetPage = parseInt(page);
     const ITEMS_PER_PAGE = 50;
-    
-    let search = await youtube.search(query);
-    
+
+    // ✅ q=word/short/4k を分解
+    const queryTokens = rawQuery.split('/').filter(Boolean);
+
+    // ✅ 最初の要素を検索ワードとして扱う
+    const query = queryTokens.shift();
+    if (!query) return res.status(400).json({ error: "Missing search query" });
+
+    // ✅ パス側 /live/4k の分解
+    const pathTokens = filterPath
+      ? filterPath.split('/').filter(Boolean)
+      : [];
+
+    // ✅ 全トークンを統合
+    const allTokens = [...queryTokens, ...pathTokens];
+
+    // ✅ フィルター変換
+    const filters = {};
+
+    for (const token of allTokens) {
+      if (["video", "channel", "playlist"].includes(token)) {
+        filters.type = token;
+      }
+      else if (["relevance", "upload_date", "view_count", "rating"].includes(token)) {
+        filters.sort = token;
+      }
+      else if (["hour", "today", "week", "month", "year"].includes(token)) {
+        filters.upload_date = token;
+      }
+      else if (["short", "medium", "long"].includes(token)) {
+        filters.duration = token;
+      }
+      else if (["hd", "subtitles", "live", "4k", "vr180"].includes(token)) {
+        if (!filters.features) filters.features = [];
+        filters.features.push(token);
+      }
+    }
+
+    // ✅ フィルター付き検索
+    let search = await youtube.search(query, filters);
+
     let allVideos = [...(search.videos || [])];
     let allShorts = [...(search.shorts || [])];
     let allChannels = [...(search.channels || [])];
@@ -156,13 +195,17 @@ app.get('/api/search', async (req, res) => {
     let continuationAttempts = 0;
     const MAX_ATTEMPTS = 20;
 
-    while (allVideos.length < requiredCount && search.has_continuation && continuationAttempts < MAX_ATTEMPTS) {
-        search = await search.getContinuation();
-        if (search.videos) allVideos.push(...search.videos);
-        if (search.shorts) allShorts.push(...search.shorts);
-        if (search.channels) allChannels.push(...search.channels);
-        if (search.playlists) allPlaylists.push(...search.playlists);
-        continuationAttempts++;
+    while (
+      allVideos.length < requiredCount &&
+      search.has_continuation &&
+      continuationAttempts < MAX_ATTEMPTS
+    ) {
+      search = await search.getContinuation();
+      if (search.videos) allVideos.push(...search.videos);
+      if (search.shorts) allShorts.push(...search.shorts);
+      if (search.channels) allChannels.push(...search.channels);
+      if (search.playlists) allPlaylists.push(...search.playlists);
+      continuationAttempts++;
     }
 
     const startIndex = (targetPage - 1) * ITEMS_PER_PAGE;
@@ -176,17 +219,20 @@ app.get('/api/search', async (req, res) => {
     const hasMore = allVideos.length > endIndex || search.has_continuation;
 
     res.status(200).json({
-        videos: pagedVideos,
-        shorts: pagedShorts,
-        channels: pagedChannels,
-        playlists: pagedPlaylists,
-        nextPageToken: hasMore ? String(targetPage + 1) : undefined
+      appliedFilters: filters,
+      videos: pagedVideos,
+      shorts: pagedShorts,
+      channels: pagedChannels,
+      playlists: pagedPlaylists,
+      nextPageToken: hasMore ? String(targetPage + 1) : undefined
     });
-  } catch (err) { 
-      console.error('Error in /api/search:', err); 
-      res.status(500).json({ error: err.message }); 
+
+  } catch (err) {
+    console.error('Error in /api/search:', err);
+    res.status(500).json({ error: err.message });
   }
 });
+
 
 // -------------------------------------------------------------------
 // コメント API (/api/comments)
