@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { CloseIcon, DownloadIcon } from './icons/Icons';
@@ -44,21 +43,33 @@ const DownloadModal: React.FC<DownloadModalProps> = ({ isOpen, onClose, streamDa
                             <div>
                                 <h3 className="text-xs font-bold text-yt-light-gray mb-2 uppercase tracking-wider">動画 (MP4)</h3>
                                 <div className="space-y-2">
-                                    {['1080p', '720p', '480p', '360p', '240p'].map(quality => {
-                                        const url = streamData.videourl?.[quality]?.video?.url;
-                                        if (!url) return null;
-                                        // 360p usually has audio in these streams, others might not
-                                        const label = quality === '360p' ? `${quality} (音声あり)` : `${quality} (音声なし)`;
+                                    {/* 1080p Separate */}
+                                    {streamData.separate1080p?.video?.url && (
+                                        <a 
+                                            href={streamData.separate1080p.video.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center justify-between p-3 rounded-lg bg-yt-light dark:bg-yt-dark-gray hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors group"
+                                            onClick={onClose}
+                                        >
+                                            <span className="font-semibold text-black dark:text-white">1080p (映像のみ)</span>
+                                            <span className="text-xs bg-black/10 dark:bg-white/10 px-2 py-1 rounded text-black dark:text-white group-hover:bg-white group-hover:text-black transition-colors">MP4</span>
+                                        </a>
+                                    )}
+
+                                    {/* Combined Formats (360p, 720p, etc.) */}
+                                    {streamData.combinedFormats && streamData.combinedFormats.map((format: any, index: number) => {
+                                        const quality = format.quality || 'Unknown';
                                         return (
                                             <a 
-                                                key={quality}
-                                                href={url}
+                                                key={index}
+                                                href={format.url}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="flex items-center justify-between p-3 rounded-lg bg-yt-light dark:bg-yt-dark-gray hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors group"
                                                 onClick={onClose}
                                             >
-                                                <span className="font-semibold text-black dark:text-white">{label}</span>
+                                                <span className="font-semibold text-black dark:text-white">{quality} (音声あり)</span>
                                                 <span className="text-xs bg-black/10 dark:bg-white/10 px-2 py-1 rounded text-black dark:text-white group-hover:bg-white group-hover:text-black transition-colors">MP4</span>
                                             </a>
                                         );
@@ -66,17 +77,17 @@ const DownloadModal: React.FC<DownloadModalProps> = ({ isOpen, onClose, streamDa
                                 </div>
                             </div>
                             
-                            {streamData.videourl?.['144p']?.audio?.url && (
+                            {streamData.audioOnlyFormat?.url && (
                                 <div>
                                     <h3 className="text-xs font-bold text-yt-light-gray mb-2 uppercase tracking-wider mt-4">音声 (M4A)</h3>
                                     <a 
-                                        href={streamData.videourl['144p'].audio.url}
+                                        href={streamData.audioOnlyFormat.url}
                                         target="_blank" 
                                         rel="noopener noreferrer"
                                         className="flex items-center justify-between p-3 rounded-lg bg-yt-light dark:bg-yt-dark-gray hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors group"
                                         onClick={onClose}
                                     >
-                                        <span className="font-semibold text-black dark:text-white">音声のみ</span>
+                                        <span className="font-semibold text-black dark:text-white">音声のみ ({streamData.audioOnlyFormat.quality || ''})</span>
                                         <span className="text-xs bg-black/10 dark:bg-white/10 px-2 py-1 rounded text-black dark:text-white group-hover:bg-white group-hover:text-black transition-colors">M4A</span>
                                     </a>
                                 </div>

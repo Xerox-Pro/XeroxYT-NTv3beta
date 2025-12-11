@@ -333,11 +333,23 @@ const VideoPlayerPage: React.FC = () => {
         return `${src}?${params}`;
     }, [videoDetails, playerParams]);
 
-    // Get 360p MP4 URL for Stream mode
+    // Get 360p or 720p URL for Stream mode (Updated for new JSON structure)
     const getStreamUrl = useMemo(() => {
-        if (!streamData?.videourl) return null;
-        // Prioritize 360p as requested
-        return streamData.videourl['360p']?.video?.url || null;
+        if (!streamData) return null;
+        
+        // Use streamingUrl if available (usually 360p or 720p)
+        if (streamData.streamingUrl) return streamData.streamingUrl;
+        
+        // Fallback: look in combinedFormats for 360p
+        if (streamData.combinedFormats) {
+             const format360 = streamData.combinedFormats.find((f: any) => f.quality === '360p');
+             if (format360) return format360.url;
+             
+             // Fallback to any available format
+             if (streamData.combinedFormats.length > 0) return streamData.combinedFormats[0].url;
+        }
+
+        return null;
     }, [streamData]);
 
     const updateUrlParams = (key: string, value: string | null) => {

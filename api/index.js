@@ -27,8 +27,8 @@ app.get('/api/stream/:videoId', async (req, res) => {
     const { videoId } = req.params;
     if (!videoId) return res.status(400).json({ error: "Missing video id" });
 
-    // ターゲットURL
-    const targetUrl = `https://siawaseok.duckdns.org/api/stream/${videoId}/type2`;
+    // ターゲットURL (更新: 外部APIを使用)
+    const targetUrl = `https://xerox-yt-litev2-o3al.vercel.app/api/video-info?videoId=${videoId}`;
 
     // 外部APIから取得
     const response = await fetch(targetUrl);

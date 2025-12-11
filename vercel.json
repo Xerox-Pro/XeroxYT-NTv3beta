@@ -2,11 +2,6 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/stream.js",
-      "use": "@vercel/node",
-      "config": { "includeFiles": ["yt-dlp_linux"] }
-    },
-    {
       "src": "api/index.js",
       "use": "@vercel/node"
     },
@@ -19,10 +14,6 @@
     }
   ],
   "routes": [
-    {
-      "src": "/api/stream",
-      "dest": "/api/stream.js"
-    },
     {
       "src": "/api/(.*)",
       "dest": "/api/index.js"

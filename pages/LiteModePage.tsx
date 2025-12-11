@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { usePreference } from '../contexts/PreferenceContext';
 
@@ -118,11 +117,17 @@ const LiteModePage: React.FC = () => {
     const createStreamPlayer = (data: any, container: HTMLDivElement | null) => {
         if (!container) return;
         
-        // Prioritize 360p video URL
-        const url = data.videourl?.['360p']?.video?.url;
+        // Prioritize 360p video URL from new structure
+        let url = data.streamingUrl; // Often this is the 360p or 720p direct link
         
+        if (!url && data.combinedFormats) {
+            // Fallback to searching in combinedFormats
+            const format = data.combinedFormats.find((f: any) => f.quality === '360p' || f.quality === '720p');
+            if (format) url = format.url;
+        }
+
         if (!url) {
-            setError('ストリーミング可能な動画ソース(360p)が見つかりませんでした。');
+            setError('ストリーミング可能な動画ソース(360p/720p)が見つかりませんでした。');
             container.innerHTML = '';
             return;
         }
@@ -209,23 +214,31 @@ const LiteModePage: React.FC = () => {
                         <h3 className="text-center text-[#3c3e4e] text-xl font-bold mb-4">Download Links</h3>
                         <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto">
                             {/* Video Links */}
-                            {['1080p', '720p', '480p', '360p', '240p'].map(quality => {
-                                const url = streamData.videourl?.[quality]?.video?.url;
+                            {/* 1080p */}
+                            {streamData.separate1080p?.video?.url && (
+                                <a href={streamData.separate1080p.video.url} target="_blank" rel="noreferrer" className="block bg-[#f7f8fa] border-[1.5px] border-[#e0e3eb] rounded-[8px] p-3 text-[#333] font-medium hover:bg-[#e9ecf0] transition-colors break-all">
+                                    Download Video 1080p (映像のみ) (MP4)
+                                </a>
+                            )}
+                            
+                            {/* Combined Formats (720p, 360p, etc.) */}
+                            {streamData.combinedFormats && streamData.combinedFormats.map((format: any, index: number) => {
+                                const quality = format.quality || 'Unknown';
+                                const url = format.url;
                                 if (!url) return null;
-                                const label = quality === '360p' ? `${quality} (音声あり)` : `${quality} (音声なし)`;
                                 return (
-                                    <a key={quality} href={url} target="_blank" rel="noreferrer" className="block bg-[#f7f8fa] border-[1.5px] border-[#e0e3eb] rounded-[8px] p-3 text-[#333] font-medium hover:bg-[#e9ecf0] transition-colors break-all">
-                                        Download Video {label} (MP4)
+                                    <a key={index} href={url} target="_blank" rel="noreferrer" className="block bg-[#f7f8fa] border-[1.5px] border-[#e0e3eb] rounded-[8px] p-3 text-[#333] font-medium hover:bg-[#e9ecf0] transition-colors break-all">
+                                        Download Video {quality} (音声あり) (MP4)
                                     </a>
                                 );
                             })}
                             
                             {/* Audio Link */}
-                            {streamData.videourl?.['144p']?.audio?.url && (
+                            {streamData.audioOnlyFormat?.url && (
                                 <>
                                     <h4 className="mt-4 font-bold text-[#333]">オーディオ (音声のみ)</h4>
-                                    <a href={streamData.videourl['144p'].audio.url} target="_blank" rel="noreferrer" className="block bg-[#f7f8fa] border-[1.5px] border-[#e0e3eb] rounded-[8px] p-3 text-[#333] font-medium hover:bg-[#e9ecf0] transition-colors break-all">
-                                        Download Audio (M4A)
+                                    <a href={streamData.audioOnlyFormat.url} target="_blank" rel="noreferrer" className="block bg-[#f7f8fa] border-[1.5px] border-[#e0e3eb] rounded-[8px] p-3 text-[#333] font-medium hover:bg-[#e9ecf0] transition-colors break-all">
+                                        Download Audio {streamData.audioOnlyFormat.quality || ''} (M4A)
                                     </a>
                                 </>
                             )}
