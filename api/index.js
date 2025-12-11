@@ -36,8 +36,12 @@ app.get('/api/stream/:videoId', async (req, res) => {
     // ステータスコードを転送
     res.status(response.status);
 
-    // ヘッダーを転送
+    // ヘッダーを転送 (CORSやEncoding関連の衝突を避けるためフィルタリング)
     response.headers.forEach((val, key) => {
+      const lowerKey = key.toLowerCase();
+      if (['content-encoding', 'content-length', 'transfer-encoding', 'connection', 'access-control-allow-origin'].includes(lowerKey)) {
+        return;
+      }
       res.setHeader(key, val);
     });
 
