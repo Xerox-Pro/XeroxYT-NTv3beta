@@ -14,7 +14,7 @@ import DownloadModal from '../components/DownloadModal';
 import CommentComponent from '../components/Comment';
 import PlaylistPanel from '../components/PlaylistPanel';
 import RelatedVideoCard from '../components/RelatedVideoCard';
-import { LikeIcon, SaveIcon, MoreIconHorizontal, DownloadIcon, DislikeIcon, ChevronRightIcon } from '../components/icons/Icons';
+import { LikeIcon, SaveIcon, MoreIconHorizontal, DownloadIcon, DislikeIcon, ChevronRightIcon, RepeatIcon } from '../components/icons/Icons';
 
 const VideoPlayerPage: React.FC = () => {
     const { videoId } = useParams<{ videoId: string }>();
@@ -32,6 +32,7 @@ const VideoPlayerPage: React.FC = () => {
     const [playlistVideos, setPlaylistVideos] = useState<Video[]>([]);
     const [isCollaboratorMenuOpen, setIsCollaboratorMenuOpen] = useState(false);
     const collaboratorMenuRef = useRef<HTMLDivElement>(null);
+    const iframeRef = useRef<HTMLIFrameElement>(null);
     
     // State for player params string instead of YT.Player object
     const [playerParams, setPlayerParams] = useState<string>('');
@@ -189,7 +190,7 @@ const VideoPlayerPage: React.FC = () => {
                         setVideoDetails(details);
                         // Request: No XRAI, just 20 items whatever they are.
                         if (details.relatedVideos && details.relatedVideos.length > 0) {
-                            setRelatedVideos(details.relatedVideos.slice(0, 50));
+                            setRelatedVideos(details.relatedVideos.slice(0, 20));
                         }
                         addVideoToHistory(details);
                         setIsLoading(false);
@@ -222,7 +223,7 @@ const VideoPlayerPage: React.FC = () => {
                         // Overwrite if external source is better or supplementary
                         setRelatedVideos(prev => {
                             if (prev.length > 0) return prev; // Keep internal related if available
-                            return externalRelated.slice(0, 50);
+                            return externalRelated.slice(0, 20);
                         });
                     }
                 })
@@ -290,13 +291,26 @@ const VideoPlayerPage: React.FC = () => {
             // Check for YouTube State Change event
             // data.info === 0 corresponds to YT.PlayerState.ENDED
             if (data && data.event === 'onStateChange' && data.info === 0) {
-                navigateToNextVideo();
+                if (isLoop && !currentPlaylist) {
+                    // Single video loop: Seek to 0 and play (simulate loop)
+                    if (iframeRef.current && iframeRef.current.contentWindow) {
+                        iframeRef.current.contentWindow.postMessage(
+                            JSON.stringify({ event: 'command', func: 'seekTo', args: [0, true] }), '*'
+                        );
+                        // Trigger play just in case
+                        iframeRef.current.contentWindow.postMessage(
+                            JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*'
+                        );
+                    }
+                } else {
+                    navigateToNextVideo();
+                }
             }
         };
 
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, [navigateToNextVideo]);
+    }, [navigateToNextVideo, isLoop, currentPlaylist]);
 
     const iframeSrc = useMemo(() => {
         if (!videoDetails?.id || !playerParams) return '';
@@ -419,6 +433,7 @@ const VideoPlayerPage: React.FC = () => {
                     {defaultPlayerMode === 'player' ? (
                         playerParams && videoId && (
                             <iframe
+                                ref={iframeRef}
                                 src={iframeSrc}
                                 key={iframeSrc}
                                 title={videoDetails.title}
@@ -436,6 +451,7 @@ const VideoPlayerPage: React.FC = () => {
                                 controls 
                                 autoPlay 
                                 playsInline 
+                                loop={isLoop} // Native loop for stream mode
                                 className="w-full h-full"
                                 onError={(e) => console.error("Video Playback Error", e)}
                             >
@@ -565,6 +581,15 @@ const VideoPlayerPage: React.FC = () => {
                                     <DislikeIcon />
                                 </button>
                             </div>
+
+                            {/* Loop Button */}
+                            <button 
+                                onClick={toggleLoop}
+                                className={`flex items-center justify-center rounded-full w-9 h-9 transition-colors flex-shrink-0 ${isLoop ? 'bg-yt-light dark:bg-[#272727] text-yt-blue' : 'bg-yt-light dark:bg-[#272727] text-black dark:text-white hover:bg-[#e5e5e5] dark:hover:bg-[#3f3f3f]'}`}
+                                title={isLoop ? "ループ再生 (オン)" : "ループ再生 (オフ)"}
+                            >
+                                <RepeatIcon className="fill-current w-5 h-5" />
+                            </button>
 
                             {/* Download Button */}
                             <button 
