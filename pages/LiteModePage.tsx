@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { usePreference } from '../contexts/PreferenceContext';
+import { getRawStreamData } from '../utils/api';
 
 const LiteModePage: React.FC = () => {
     const { toggleLiteMode } = usePreference();
@@ -84,12 +85,8 @@ const LiteModePage: React.FC = () => {
             } else {
                 let data = streamData;
                 if (!data || vId !== videoId) {
-                    // Fetch from the proxy endpoint that returns the detailed JSON
-                    const response = await fetch(`/api/stream/${vId}`);
-                    if (!response.ok) {
-                        throw new Error(`ストリーム情報の取得に失敗しました。 (${response.status})`);
-                    }
-                    data = await response.json();
+                    // Use the utility function which handles caching
+                    data = await getRawStreamData(vId);
                     setStreamData(data);
                 }
 

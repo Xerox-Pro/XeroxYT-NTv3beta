@@ -268,11 +268,22 @@ export interface StreamUrls {
 }
   
 export async function getStreamUrls(videoId: string): Promise<StreamUrls> {
-    return await apiFetch(`stream?id=${videoId}`);
+    // FIX: Using correct path param instead of query
+    return await apiFetch(`stream/${videoId}`);
 }
 
 export async function getRawStreamData(videoId: string): Promise<any> {
-    return await apiFetch(`stream/${videoId}`);
+    // Enable caching for stream data to save bandwidth, but with shorter TTL (1 hour)
+    // as streaming links often expire in 6 hours.
+    const cacheKey = `stream-data-${videoId}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return cached;
+
+    const data = await apiFetch(`stream/${videoId}`);
+    
+    // Cache for 1 hour
+    cache.set(cacheKey, data, 60 * 60 * 1000);
+    return data;
 }
 
 // --- HOME TAB TYPES AND FUNCTIONS ---

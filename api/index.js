@@ -27,8 +27,8 @@ app.get('/api/stream/:videoId', async (req, res) => {
     const { videoId } = req.params;
     if (!videoId) return res.status(400).json({ error: "Missing video id" });
 
-    // ターゲットURL (更新: 外部APIを使用)
-    const targetUrl = `https://xerox-yt-litev2-o3al.vercel.app/api/video-info?videoId=${videoId}`;
+    // ターゲットURL (更新: xeroxdwapiを使用)
+    const targetUrl = `https://xeroxdwapi.vercel.app/api/info?url=https://www.youtube.com/watch?v=${videoId}`;
 
     // 外部APIから取得
     const response = await fetch(targetUrl);
